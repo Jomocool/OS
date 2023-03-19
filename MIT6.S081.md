@@ -14,7 +14,7 @@ fork（）函数通过系统调用创建一个与原来进程几乎完全相同�
 
 
 
-![image-20230319173008087](C:\Users\86135\OneDrive\文档\操作系统\MIT6.S081-img\1.png)
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081-img/1.png)
 
 **执行过程：**
 
@@ -31,7 +31,7 @@ the child exited with status 0
 
 
 
-![image-20230319173605104](C:\Users\86135\OneDrive\文档\操作系统\MIT6.S081-img\2.png)
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081-img/2.png)
 
 xklsdksdjkecho不存在
 
