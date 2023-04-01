@@ -78,3 +78,51 @@ exit #再exit就是退出shell回话了
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/20.png)
 
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/21.png)
+
+## 指定运行级别
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/22.png)
+
+## 找回root密码
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/23.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/24.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/25.png)
+
+## 帮助指令
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/26.png)
+
+## 文件目录指令
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/27.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/28.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/29.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/30.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/31.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/32.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/33.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/34.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/35.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/36.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/37.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/38.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/39.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/40.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/41.png)
