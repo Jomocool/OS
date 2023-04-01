@@ -116,3 +116,217 @@ Write a program that uses UNIX system calls to “ping-pong” a byte between tw
 - 使用getpid函数 找到当前进程的Process ID
 - 添加pingpong用户程序 到Makefile的 UPROGS中
 - 你可以在user/user.h 中找到用户程序中所有可用的库函数, 他们的实现代码在user/lib.c,user/printf.c, user/umalloc.c中
+
+**pipe()：**
+
+- 管道只是单向通信，即我们可以使用管道，使得一个进程写入管道，另一个进程从管道读取。它打开一个管道，这是被视为***“虚拟文件”\***的主内存区域。
+- 创建进程及其所有子进程可以使用管道进行读取和写入。一个进程可以写入此“虚拟文件”或管道，另一个相关进程可以从中读取。
+- 如果进程在将某些内容写入管道之前尝试读取，则该进程将挂起，直到写入某些内容。
+- 管道系统调用查找进程的打开文件表中的前两个可用位置，并将它们分配给管道的读取端和写入端。
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081Lab-img/1.png)
+
+```c
+函数调用：
+int pipe(int fds[2]);
+
+Parameters :
+fd[0] will be the fd(file descriptor) for the 
+read end of pipe.
+fd[1] will be the fd for the write end of pipe.
+Returns : 0 on Success.
+-1 on error.
+```
+
+管道的行为类似于**FIFO（**先进先出），管道的行为类似于**队列**数据结构。读取和写入的大小不必在此处匹配。我们一次可以写入 **512** 个字节，但我们一次只能在管道中读取 1 个字节。
+
+
+
+**eg.**
+
+```c
+// C program to illustrate
+// pipe system call in C
+#include <stdio.h>
+#include <unistd.h>
+#define MSGSIZE 16
+char* msg1 = "hello, world #1";
+char* msg2 = "hello, world #2";
+char* msg3 = "hello, world #3";
+
+int main()
+{
+	char inbuf[MSGSIZE];
+	int p[2], i;
+
+	if (pipe(p) < 0)
+		exit(1);
+
+	/* continued */
+	/* write pipe */
+
+	write(p[1], msg1, MSGSIZE);
+	write(p[1], msg2, MSGSIZE);
+	write(p[1], msg3, MSGSIZE);
+
+	for (i = 0; i < 3; i++) {
+		/* read pipe */
+		read(p[0], inbuf, MSGSIZE);
+		printf("% s\n", inbuf);
+	}
+	return 0;
+}
+```
+
+**输出：**
+
+```c
+hello, world #1
+hello, world #2
+hello, world #3
+```
+
+
+
+**Parent and child share a pipe**
+
+当我们在任何进程中使用 [fork](https://www.geeksforgeeks.org/fork-system-call/) 时，文件描述符在子进程和父进程中保持打开状态。如果我们在创建管道后调用 fork，那么父子可以通过管道进行通信。
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081Lab-img/2.png)
+
+**eg.**
+
+```c
+// C program to illustrate
+// pipe system call in C
+// shared by Parent and Child
+#include <stdio.h>
+#include <unistd.h>
+#define MSGSIZE 16
+char* msg1 = "hello, world #1";
+char* msg2 = "hello, world #2";
+char* msg3 = "hello, world #3";
+
+int main()
+{
+	char inbuf[MSGSIZE];
+	int p[2], pid, nbytes;
+
+	if (pipe(p) < 0)
+		exit(1);
+
+	/* continued */
+	if ((pid = fork()) > 0) {
+		write(p[1], msg1, MSGSIZE);
+		write(p[1], msg2, MSGSIZE);
+		write(p[1], msg3, MSGSIZE);
+
+		// Adding this line will
+		// not hang the program
+		// close(p[1]);
+		wait(NULL);
+	}
+
+	else {
+		// Adding this line will
+		// not hang the program
+		// close(p[1]);
+		while ((nbytes = read(p[0], inbuf, MSGSIZE)) > 0)
+			printf("% s\n", inbuf);
+		if (nbytes != 0)
+			exit(2);
+		printf("Finished reading\n");
+	}
+	return 0;
+}
+```
+
+**输出：**
+
+```c
+hello world, #1
+hello world, #2
+hello world, #3
+//(hangs) program does not terminate but hangs -- 非输出内容
+```
+
+
+
+**pingpong.c**
+
+```c
+#include"kernel/types.h"
+#include"user/user.h"
+
+#define BUF_SIZE 16 //定义读入写出块大小
+
+int main(int argc,char* argv[]){
+	int fd[2];//声明数组用于write，read
+	char buf[BUF_SIZE];//读入写出块
+	//1.Use pipe to create a pipe.
+	if(pipe(fd)<0){//异常
+		printf("error\n");
+		exit(1);
+	}
+
+	//* continue *
+	//2.Use fork to create a child.
+	if(fork()>0){
+		//parent process
+		write(fd[1],"ping",BUF_SIZE);//3.父进程向管道写入ping给子进程
+		wait((int*)0);//等待子进程接收
+		read(fd[0],buf,BUF_SIZE);//6.父进程接收管道中来自子进程的pong
+		printf("<%d> received %s.\n",getpid(),buf);//父进程输出自己的进程号，并说明received pong
+	}else{
+		//child process
+		read(fd[0],buf,BUF_SIZE);//4.子进程接收管道中来自父进程的ping
+		printf("<%d> received %s.\n",getpid(),buf);//子进程输出自己的进程号，并说明received ping
+		write(fd[1],"pong",BUF_SIZE);//5.子进程向管道中写入pong给父进程
+	}
+
+	exit(0);
+}
+```
+
+**Add the program to `UPROGS` in Makefile.**
+
+```shell
+UPROGS=\
+	$U/_cat\
+	$U/_echo\
+	$U/_forktest\
+	$U/_grep\
+	$U/_init\
+	$U/_kill\
+	$U/_ln\
+	$U/_ls\
+	$U/_mkdir\
+	$U/_rm\
+	$U/_sh\
+	$U/_stressfs\
+	$U/_usertests\
+	$U/_grind\
+	$U/_wc\
+	$U/_zombie\
+	$U/_sleep\
+	$U/_pingpong\  //here!
+```
+
+**进入qemu环境**
+
+```shell
+xv6 kernel is booting
+hart 1 starting
+hart 2 starting
+init: starting sh
+
+$ pingpong
+```
+
+**输出：**
+
+```shell
+<4> received ping.
+<3> received pong.
+```
+
