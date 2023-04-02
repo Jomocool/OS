@@ -330,3 +330,144 @@ $ pingpong
 <3> received pong.
 ```
 
+### primes([moderate](https://pdos.csail.mit.edu/6.S081/2020/labs/guidance.html))/([hard](https://pdos.csail.mit.edu/6.S081/2020/labs/guidance.html))
+
+Write a concurrent version of prime sieve using pipes. This idea is due to Doug McIlroy, inventor of Unix pipes. The picture halfway down [this page](http://swtch.com/~rsc/thread/) and the surrounding text explain how to do it. Your solution should be in the file `user/primes.c`.
+
+Your goal is to use `pipe` and `fork` to set up the pipeline. The first process feeds the numbers 2 through 35 into the pipeline. For each prime number, you will arrange to create one process that reads from its left neighbor over a pipe and writes to its right neighbor over another pipe. Since xv6 has limited number of file descriptors and processes, the first process can stop at 35.
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081Lab-img/3.png)
+
+[素数筛法](https://zhuanlan.zhihu.com/p/100051075)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081Lab-img/4.png)
+
+**primes.c**
+
+```c
+#include"kernel/types.h"
+#include"user/user.h"
+
+#define MSGSIZE 36
+#define ZERO '0'
+#define ONE '1'
+
+void prime(int pipe_read,int pipe_write){
+    char buf[MSGSIZE];//用于接收管道中父进程传来的数据
+    read(pipe_read,buf,MSGSIZE);//读取父进程从管道传来的数据
+    int val=0;//接收第一个素数
+    for(int i=2;i<MSGSIZE;i++){
+        if(buf[i]==ONE){//由于2是第一个素数，所以先设置为ONE
+            val=i;
+            break;
+        }
+    }
+    if(val==0){
+        exit(0);//说明全部都处理完了，退出进程
+    }
+
+    printf("prime %d\n",val);
+
+    for(int i=1;val*i<MSGSIZE;i++){
+        //把素数的倍数淘汰，因为肯定不是素数。同时把val本身置为ZERO，防止后续重复打印
+        buf[val*i]=ZERO;
+    }
+
+    if(fork()>0){
+        //子节点(当前)
+        write(pipe_write,buf,MSGSIZE);
+        wait(0);
+    }else{
+        //孙节点
+        prime(pipe_read,pipe_write);
+    }
+}
+
+int main(int argc,char*argv[]){
+    int fd[2];
+    pipe(fd);//开辟管道
+    
+    char buf[MSGSIZE];//记录是否为素数
+    for(int i=2;i<MSGSIZE;i++){
+        buf[i]=ONE;//都先标为素数，之后再淘汰(标为ZERO)
+    }
+
+    if(fork()>0){
+        //parent process
+        buf[0]=ZERO;//ZERO(非素数)
+        buf[1]=ONE;//ONE(素数)
+        write(fd[1],buf,MSGSIZE);//向管道中写入buf传给子进程
+        wait(0);//等待子进程
+    }else{
+        //child process;
+        prime(fd[0],fd[1]);
+        wait(0);//子进程也是别人的父进程，等待
+    }
+
+    exit(0);
+}
+```
+
+**Makefile**
+
+```shell
+UPROGS=\
+	$U/_cat\
+	$U/_echo\
+	$U/_forktest\
+	$U/_grep\
+	$U/_init\
+	$U/_kill\
+	$U/_ln\
+	$U/_ls\
+	$U/_mkdir\
+	$U/_rm\
+	$U/_sh\
+	$U/_stressfs\
+	$U/_usertests\
+	$U/_grind\
+	$U/_wc\
+	$U/_zombie\
+	$U/_sleep\
+	$U/_pingpong\
+	$U/_primes\ //here!
+```
+
+**sudo make qemu**
+
+```shell
+xv6 kernel is booting
+hart 2 starting
+hart 1 starting
+init: starting sh
+
+$ primes
+```
+
+**输出**
+
+```shell
+prime 2
+prime 3
+prime 5
+prime 7
+prime 11
+prime 13
+prime 17
+prime 19
+prime 23
+prime 29
+prime 31
+```
+
+**总结：**
+
+1. pipe实际上就是用来帮助进程之间相互传输资源的，但是由于pipe类似于队列，所以要注意读写顺序。
+2. pipe实际上很占用资源，所以要注意使用。
+
+
+
+### find ([moderate](https://pdos.csail.mit.edu/6.S081/2020/labs/guidance.html))
+
+Write a simple version of the UNIX find program: find all the files in a directory tree with a specific name. Your solution should be in the file `user/find.c`.
+
