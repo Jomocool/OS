@@ -471,3 +471,415 @@ prime 31
 
 Write a simple version of the UNIX find program: find all the files in a directory tree with a specific name. Your solution should be in the file `user/find.c`.
 
+### find ([moderate](https://pdos.csail.mit.edu/6.S081/2020/labs/guidance.html))
+
+Write a simple version of the UNIX find program: find all the files in a directory tree with a specific name. Your solution should be in the file `user/find.c`.
+
+
+
+**ls.c**
+
+```c
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+#include "kernel/fs.h"
+
+char*
+fmtname(char *path)
+{
+  static char buf[DIRSIZ+1];
+  char *p;
+
+  // Find first character after last slash.
+  for(p=path+strlen(path); p >= path && *p != '/'; p--)
+    ;
+  p++;
+
+  // Return blank-padded name.
+  if(strlen(p) >= DIRSIZ)
+    return p;
+  memmove(buf, p, strlen(p));
+  memset(buf+strlen(p), ' ', DIRSIZ-strlen(p));
+  return buf;
+}
+
+void
+ls(char *path)//path：当前文件路径
+{
+  char buf[512], *p;
+  int fd;
+  struct dirent de;
+  struct stat st;
+
+  if((fd = open(path, 0)) < 0){//打开文件异常
+    fprintf(2, "ls: cannot open %s\n", path);
+    return;
+  }
+
+  if(fstat(fd, &st) < 0){//把文件状态信息加载到st上，如果函数返回小于0，说明有异常
+    fprintf(2, "ls: cannot stat %s\n", path);
+    close(fd);
+    return;
+  }
+
+  switch(st.type){//对于不同状态信息的文件，有不同的展示方式
+  case T_FILE://文件
+    printf("%s %d %d %l\n", fmtname(path), st.type, st.ino, st.size);
+    break;
+
+  case T_DIR://文件夹
+    if(strlen(path) + 1 + DIRSIZ + 1 > sizeof buf){//超过buf大小
+      printf("ls: path too long\n");
+      break;
+    }
+    strcpy(buf, path);
+    p = buf+strlen(buf);
+    *p++ = '/';
+    while(read(fd, &de, sizeof(de)) == sizeof(de)){
+      if(de.inum == 0)
+        continue;
+      memmove(p, de.name, DIRSIZ);
+      p[DIRSIZ] = 0;
+      if(stat(buf, &st) < 0){
+        printf("ls: cannot stat %s\n", buf);
+        continue;
+      }
+      printf("%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
+    }
+    break;
+  }
+  close(fd);
+}
+
+int
+main(int argc, char *argv[])
+{
+  int i;
+
+  /*
+  调用ls指令：ls 文件名
+  argc用于接收参数个数，ls一个，文件名一个，总共两个
+  如果argc小于2的话，说明没有文件名可接收，直接展示当前文件夹，所以就是ls(".")
+  */
+  if(argc < 2){
+    ls(".");
+    exit(0);
+  }
+    
+  /*
+  如果argc>=2，说明有文件名，遍历这些文件夹，依次展示
+  */
+  for(i=1; i<argc; i++)
+    ls(argv[i]);
+  exit(0);
+}
+```
+
+在ls的基础上完成find
+
+**find.c**
+
+```c
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+#include "kernel/fs.h"
+
+char*
+fmtname(char *path)
+{
+  static char buf[DIRSIZ+1];
+  char *p;
+
+  // Find first character after last slash.
+  for(p=path+strlen(path); p >= path && *p != '/'; p--)
+    ;
+  p++;
+
+  // Return blank-padded name.
+  if(strlen(p) >= DIRSIZ)
+    return p;
+  memmove(buf, p, strlen(p));
+  memset(buf+strlen(p), 0, DIRSIZ-strlen(p));
+  return buf;
+}
+
+//判断当前路径能否递归，.和..无法递归
+//1：可递归
+//0：不可递归
+int norecurse(char *path){
+    char* buf=fmtname(path);
+    if(buf[0]=='.'&&buf[1]==0){
+        return 1;
+    }
+    if(buf[0]=='.'&&buf[1]=='.'&&buf[2]==0){
+        return 1;
+    }
+    return 0;
+}
+
+void
+find(char *path,char* target)//在当前文件夹下，找到target
+{
+  char buf[512], *p;
+  int fd;
+  struct dirent de;
+  struct stat st;
+
+  if((fd = open(path, 0)) < 0){
+    fprintf(2, "ls: cannot open %s\n", path);
+    return;
+  }
+
+  if(fstat(fd, &st) < 0){
+    fprintf(2, "ls: cannot stat %s\n", path);
+    close(fd);
+    return;
+  }
+
+  if(strcmp(fmtname(path),target)==0){//标准化文件名和target相同，说明要找的就是当前文件，直接打印即可
+    printf("%s\n",path);
+  }
+
+  switch(st.type){
+  case T_FILE:
+    break;
+
+  case T_DIR:
+    if(strlen(path) + 1 + DIRSIZ + 1 > sizeof buf){
+      printf("ls: path too long\n");
+      break;
+    }
+    strcpy(buf, path);
+    p = buf+strlen(buf);
+    *p++ = '/';
+    while(read(fd, &de, sizeof(de)) == sizeof(de)){//while循环是为了遍历当前文件夹所有文件，同时递归查找target
+      if(de.inum == 0)
+        continue;
+      memmove(p, de.name, DIRSIZ);
+      p[DIRSIZ] = 0;
+      if(stat(buf, &st) < 0){
+        printf("ls: cannot stat %s\n", buf);
+        continue;
+      }
+      if(norecurse(buf)==0){//递归查找
+        find(buf,target);
+      }
+    }
+    break;
+  }
+  close(fd);
+}
+
+int
+main(int argc, char *argv[])//argv是参数列表，argc是参数列表中的参数个数
+{
+  if(argc==1){
+    printf("usage: find [path] [target]\n");
+    exit(0);
+  }
+
+  if(argc==2){//找到当前文件夹下的argv[1]文件
+    find(".",argv[1]);
+    exit(0);
+  }
+
+  if(argc==3){//找到argv[1]文件夹下的argv[2]文件
+    find(argv[1],argv[2]);
+    exit(0);
+  }
+
+  exit(0);
+}
+```
+
+**Makefile**
+
+```shell
+UPROGS=\
+	$U/_cat\
+	$U/_echo\
+	$U/_forktest\
+	$U/_grep\
+	$U/_init\
+	$U/_kill\
+	$U/_ln\
+	$U/_ls\
+	$U/_mkdir\
+	$U/_rm\
+	$U/_sh\
+	$U/_stressfs\
+	$U/_usertests\
+	$U/_grind\
+	$U/_wc\
+	$U/_zombie\
+	$U/_sleep\
+	$U/_pingpong\
+	$U/_primes\
+	$U/_find\ //here!
+```
+
+**sudo make qemu**
+
+```shell
+xv6 kernel is booting
+hart 2 starting
+hart 1 starting
+init: starting sh
+
+$ echo > b
+$ mkdir a
+$ echo > a/b
+$ find . b
+```
+
+**输出**
+
+```shell
+./b
+./a/b
+```
+
+**评分**
+
+```shell
+./grade-lab-util find
+
+== Test find, in current directory == find, in current directory: OK (3.9s) 
+== Test find, recursive == find, recursive: OK (1.2s)
+```
+
+
+
+### xargs ([moderate](https://pdos.csail.mit.edu/6.S081/2020/labs/guidance.html))
+
+Write a simple version of the UNIX xargs program: read lines from the standard input and run a command for each line, supplying the line as arguments to the command. Your solution should be in the file `user/xargs.c`.
+
+The following example illustrates xarg's behavior:
+
+```shell
+    $ echo hello too | xargs echo bye
+    bye hello too
+    $
+```
+
+Note that the command here is "echo bye" and the additional arguments are "hello too", making the command "echo bye hello too", which outputs "bye hello too".
+
+Please note that xargs on UNIX makes an optimization where it will feed more than argument to the command at a time. We don't expect you to make this optimization. To make xargs on UNIX behave the way we want it to for this lab, please run it with the -n option set to 1. For instance
+
+```shell
+    $ echo "1\n2" | xargs -n 1 echo line
+    line 1
+    line 2
+    $
+```
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081Lab-img/5.png)
+
+**xargs.c**
+
+```c
+#include"kernel/types.h"
+#include"kernel/param.h"
+#include"kernel/stat.h"
+#include"user/user.h"
+#include"kernel/fs.h"
+
+#define MSGSIZE 16
+
+//echo hello too | xargs echo bye
+int main(int argc, char* argv[]){
+    sleep(10);//先让xargs sleep，防止find还没找到相应文件夹，xargs就结束了
+    // Q1 怎么获取前一个命令的标准化输出（即此命令的标准化输入）
+    char buf[MSGSIZE];
+    read(0,buf,MSGSIZE);
+
+    //Q2 如果获取到自己的命令行参数
+    char *xargv[MAXARG];
+    int xargc=0;
+    for(int i=1;i<argc;++i){//从1开始，因为0是命令，而不是参数
+        xargv[xargc]=argv[i];
+        xargc++;
+    }
+
+    char *p=buf;
+    for(int i=0;i<MSGSIZE;++i){
+        if(buf[i]=='\n'){//遇到换行符，交给子进程去处理当前指令
+            int pid=fork();
+            if(pid>0){
+                p=&(buf[i+1]);//父进程处理下一个指令，后移指针
+                wait(0);
+            }else{
+                //Q3 如何使用exec取执行命令
+                buf[i]=0;
+                xargv[xargc]=p;
+                xargc++;
+                xargv[xargc]=0;
+                xargc++;
+
+                exec(xargv[0],xargv);
+                exit(0);
+            }
+        }
+    }
+    wait(0);
+    exit(0);
+}
+```
+
+**Makefile**
+
+```shell
+UPROGS=\
+	$U/_cat\
+	$U/_echo\
+	$U/_forktest\
+	$U/_grep\
+	$U/_init\
+	$U/_kill\
+	$U/_ln\
+	$U/_ls\
+	$U/_mkdir\
+	$U/_rm\
+	$U/_sh\
+	$U/_stressfs\
+	$U/_usertests\
+	$U/_grind\
+	$U/_wc\
+	$U/_zombie\
+	$U/_sleep\
+	$U/_pingpong\
+	$U/_primes\
+	$U/_find\
+	$U/_xargs\
+```
+
+**sudo make qemu**
+
+```shell
+xv6 kernel is booting
+hart 1 starting
+hart 2 starting
+init: starting sh
+
+sh < xargstest.sh #测试脚本
+```
+
+**输出**
+
+```shell
+$ $ $ $ $ $ hello
+hello
+hello
+```
+
+**评分**
+
+```shell
+sudo ./grade-lab-util xargs
+
+make: 'kernel/kernel' is up to date.
+== Test xargs == xargs: OK (2.7s) 
+```
+
