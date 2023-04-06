@@ -16,7 +16,8 @@
 
 
 
-## **[实验指导书](https://pdos.csail.mit.edu/6.S081/2020/labs/)**
+## **[实验指导书](https://pdos.csail.mit.edu/6.S081/2020/labs)**
+
 
 ## Lab1 Unix utilities
 
