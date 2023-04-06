@@ -8,11 +8,15 @@
 
 **参考：**
 
-[帖子详情 - Diz (ourdiz.com)](https://ourdiz.com/post/2/6/39)
+**[帖子详情 - Diz (ourdiz.com)](https://ourdiz.com/post/2/6/39)**
 
 
 
-[首页 - diz (ourdiz.com)](https://ourdiz.com/2/6)
+**[首页 - diz (ourdiz.com)](https://ourdiz.com/2/6)**
+
+
+
+## **[实验指导书](https://pdos.csail.mit.edu/6.S081/2020/labs/)**
 
 ## Lab1 Unix utilities
 
