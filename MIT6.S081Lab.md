@@ -19,6 +19,9 @@
 ## **[实验指导书](https://pdos.csail.mit.edu/6.S081/2020/labs)**
 
 
+## **[b站指导视频](https://b23.tv/ezFe1Qs)**
+在此隆重感谢大佬的教学视频
+
 ## Lab1 Unix utilities
 
 This lab will familiarize you with xv6 and its system calls.
