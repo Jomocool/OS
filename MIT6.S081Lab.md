@@ -891,3 +891,541 @@ make: 'kernel/kernel' is up to date.
 == Test xargs == xargs: OK (2.7s) 
 ```
 
+## Lab2 System calls
+
+### System call tracing ([moderate](https://pdos.csail.mit.edu/6.S081/2020/labs/guidance.html))
+
+In this assignment you will add a system call tracing feature that may help you when debugging later labs. You'll create a new `trace` system call that will control tracing. It should take one argument, an integer "mask", whose bits specify which system calls to trace. For example, to trace the fork system call, a program calls `trace(1 << SYS_fork)`, where `SYS_fork` is a syscall number from `kernel/syscall.h`. You have to modify the xv6 kernel to print out a line when each system call is about to return, if the system call's number is set in the mask. The line should contain the process id, the name of the system call and the return value; you don't need to print the system call arguments. The `trace` system call should enable tracing for the process that calls it and any children that it subsequently forks, but should not affect other processes.
+
+
+
+**Makefile**
+
+```shell
+UPROGS=\
+	$U/_cat\
+	$U/_echo\
+	$U/_forktest\
+	$U/_grep\
+	$U/_init\
+	$U/_kill\
+	$U/_ln\
+	$U/_ls\
+	$U/_mkdir\
+	$U/_rm\
+	$U/_sh\
+	$U/_stressfs\
+	$U/_usertests\
+	$U/_grind\
+	$U/_wc\
+	$U/_zombie\
+	$U/_sleep\
+	$U/_pingpong\
+	$U/_primes\
+	$U/_find\
+	$U/_xargs\
+	$U/_trace\ #here!
+```
+
+**user.h**
+
+```c
+// system calls
+int fork(void);
+int exit(int) __attribute__((noreturn));
+int wait(int*);
+int pipe(int*);
+int write(int, const void*, int);
+int read(int, void*, int);
+int close(int);
+int kill(int);
+int exec(char*, char**);
+int open(const char*, int);
+int mknod(const char*, short, short);
+int unlink(const char*);
+int fstat(int fd, struct stat*);
+int link(const char*, const char*);
+int mkdir(const char*);
+int chdir(const char*);
+int dup(int);
+int getpid(void);
+char* sbrk(int);
+int sleep(int);
+int uptime(void);
+int trace(int); //here!
+```
+
+**usys.pl**
+
+```perl
+entry("fork");
+entry("exit");
+entry("wait");
+entry("pipe");
+entry("read");
+entry("write");
+entry("close");
+entry("kill");
+entry("exec");
+entry("open");
+entry("mknod");
+entry("unlink");
+entry("fstat");
+entry("link");
+entry("mkdir");
+entry("chdir");
+entry("dup");
+entry("getpid");
+entry("sbrk");
+entry("sleep");
+entry("uptime");
+entry("trace");//here!
+```
+
+**kernel/syscall.h**
+
+```c
+// System call numbers
+#define SYS_fork    1
+#define SYS_exit    2
+#define SYS_wait    3
+#define SYS_pipe    4
+#define SYS_read    5
+#define SYS_kill    6
+#define SYS_exec    7
+#define SYS_fstat   8
+#define SYS_chdir   9
+#define SYS_dup    10
+#define SYS_getpid 11
+#define SYS_sbrk   12
+#define SYS_sleep  13
+#define SYS_uptime 14
+#define SYS_open   15
+#define SYS_write  16
+#define SYS_mknod  17
+#define SYS_unlink 18
+#define SYS_link   19
+#define SYS_mkdir  20
+#define SYS_close  21
+#define SYS_trace  22//here!
+```
+
+**sysproc.c**
+
+```c
+//Add a sys_trace() function in kernel/sysproc.c
+uint64
+sys_trace(void)
+{
+  printf("sys_trace: Hi!]\n");
+  return 0;
+}
+```
+
+**syscall.c**
+
+```c
+extern uint64 sys_chdir(void);
+extern uint64 sys_close(void);
+extern uint64 sys_dup(void);
+extern uint64 sys_exec(void);
+extern uint64 sys_exit(void);
+extern uint64 sys_fork(void);
+extern uint64 sys_fstat(void);
+extern uint64 sys_getpid(void);
+extern uint64 sys_kill(void);
+extern uint64 sys_link(void);
+extern uint64 sys_mkdir(void);
+extern uint64 sys_mknod(void);
+extern uint64 sys_open(void);
+extern uint64 sys_pipe(void);
+extern uint64 sys_read(void);
+extern uint64 sys_sbrk(void);
+extern uint64 sys_sleep(void);
+extern uint64 sys_unlink(void);
+extern uint64 sys_wait(void);
+extern uint64 sys_write(void);
+extern uint64 sys_uptime(void);
+extern uint64 sys_trace(void);//here!
+
+static uint64 (*syscalls[])(void) = {
+[SYS_fork]    sys_fork,
+[SYS_exit]    sys_exit,
+[SYS_wait]    sys_wait,
+[SYS_pipe]    sys_pipe,
+[SYS_read]    sys_read,
+[SYS_kill]    sys_kill,
+[SYS_exec]    sys_exec,
+[SYS_fstat]   sys_fstat,
+[SYS_chdir]   sys_chdir,
+[SYS_dup]     sys_dup,
+[SYS_getpid]  sys_getpid,
+[SYS_sbrk]    sys_sbrk,
+[SYS_sleep]   sys_sleep,
+[SYS_uptime]  sys_uptime,
+[SYS_open]    sys_open,
+[SYS_write]   sys_write,
+[SYS_mknod]   sys_mknod,
+[SYS_unlink]  sys_unlink,
+[SYS_link]    sys_link,
+[SYS_mkdir]   sys_mkdir,
+[SYS_close]   sys_close,
+[SYS_trace]   sys_trace, //here!
+};
+
+//通过表来驱动这些系统调用函数
+```
+
+**proc.h**
+
+```c
+// Per-process state
+struct proc {
+  struct spinlock lock;
+
+  // p->lock must be held when using these:
+  enum procstate state;        // Process state
+  struct proc *parent;         // Parent process
+  void *chan;                  // If non-zero, sleeping on chan
+  int killed;                  // If non-zero, have been killed
+  int xstate;                  // Exit status to be returned to parent's wait
+  int pid;                     // Process ID
+
+  // these are private to the process, so p->lock need not be held.
+  uint64 kstack;               // Virtual address of kernel stack
+  uint64 sz;                   // Size of process memory (bytes)
+  pagetable_t pagetable;       // User page table
+  struct trapframe *trapframe; // data page for trampoline.S
+  struct context context;      // swtch() here to run process
+  struct file *ofile[NOFILE];  // Open files
+  struct inode *cwd;           // Current directory
+  char name[16];               // Process name (debugging)
+
+  //for trace
+  int trace_mask //here!
+};
+```
+
+**syscall.c**
+
+```c
+static char *syscall_names[]={
+    "fork","exit","wait","pipe","read","kill","exec","fstat","chdir","dup","getpid","sbrk","sleep",
+    "uptime","open","write","mknod","unlink","link","mkdir","close","trace"
+};
+
+void
+syscall(void)//syscall是调用任何系统函数的入口
+{
+  int num;
+  struct proc *p = myproc();
+
+  num = p->trapframe->a7;
+  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {//如果调用的函数是系统调用的话
+    p->trapframe->a0 = syscalls[num]();//a0是寄存器，找到num对应的系统调用，
+    int trace_mask=p->trace_mask;
+    if((trace_mask>>num)&1){
+      printf("%d: syscacll %s -> %d\n",p->pid,syscall_names[num-1],p->trapframe->a0);//知道当前那些系统调用被执行了
+    }
+  } else {
+    printf("%d %s: unknown sys call %d\n",
+            p->pid, p->name, num);
+    p->trapframe->a0 = -1;
+  }
+}
+```
+
+**proc.c**
+
+```c
+// copy trace_mask in the child
+  np->trace_mask=p->trace_mask;//here!
+
+  // increment reference counts on open file descriptors.
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+---------------------------------------------------------------------------------------------------------------
+
+static void
+freeproc(struct proc *p)
+{
+  if(p->trapframe)
+    kfree((void*)p->trapframe);
+  p->trapframe = 0;
+  if(p->pagetable)
+    proc_freepagetable(p->pagetable, p->sz);
+  p->pagetable = 0;
+  p->sz = 0;
+  p->pid = 0;
+  p->parent = 0;
+  p->name[0] = 0;
+  p->chan = 0;
+  p->killed = 0;
+  p->xstate = 0;
+  p->state = UNUSED;
+  p->trace_mask = 0;//here! reset trace_mask
+}
+```
+
+**sysproc.c**
+
+```c
+//Add a sys_trace() function in kernel/sysproc.c
+uint64
+sys_trace(void)
+{
+  int mask;//接收的参数
+  if(argint(0, &mask) < 0)
+    return -1;
+
+  struct proc *p=myproc();//获取当前进程
+  p->trace_mask=mask;
+  return 0;
+}
+```
+
+### Sysinfo ([moderate](https://pdos.csail.mit.edu/6.S081/2020/labs/guidance.html))
+
+In this assignment you will add a system call, `sysinfo`, that collects information about the running system. The system call takes one argument: a pointer to a `struct sysinfo` (see `kernel/sysinfo.h`). The kernel should fill out the fields of this struct: the `freemem` field should be set to the number of bytes of free memory, and the `nproc` field should be set to the number of processes whose `state` is not `UNUSED`. We provide a test program `sysinfotest`; you pass this assignment if it prints "sysinfotest: OK".
+
+
+
+**Makefile**
+
+```shell
+UPROGS=\
+	$U/_cat\
+	$U/_echo\
+	$U/_forktest\
+	$U/_grep\
+	$U/_init\
+	$U/_kill\
+	$U/_ln\
+	$U/_ls\
+	$U/_mkdir\
+	$U/_rm\
+	$U/_sh\
+	$U/_stressfs\
+	$U/_usertests\
+	$U/_grind\
+	$U/_wc\
+	$U/_zombie\
+	$U/_trace\
+	$U/_sysinfotest\ //here!
+```
+
+**user.h**
+
+```c
+struct stat;
+struct rtcdate;
+struct sysinfo;//here!
+
+// system calls
+int fork(void);
+int exit(int) __attribute__((noreturn));
+int wait(int*);
+int pipe(int*);
+int write(int, const void*, int);
+int read(int, void*, int);
+int close(int);
+int kill(int);
+int exec(char*, char**);
+int open(const char*, int);
+int mknod(const char*, short, short);
+int unlink(const char*);
+int fstat(int fd, struct stat*);
+int link(const char*, const char*);
+int mkdir(const char*);
+int chdir(const char*);
+int dup(int);
+int getpid(void);
+char* sbrk(int);
+int sleep(int);
+int uptime(void);
+int trace(int);
+int sysinfo(struct sysinfo*);//here!
+```
+
+**usys.pl**
+
+```perl
+entry("fork");
+entry("exit");
+entry("wait");
+entry("pipe");
+entry("read");
+entry("write");
+entry("close");
+entry("kill");
+entry("exec");
+entry("open");
+entry("mknod");
+entry("unlink");
+entry("fstat");
+entry("link");
+entry("mkdir");
+entry("chdir");
+entry("dup");
+entry("getpid");
+entry("sbrk");
+entry("sleep");
+entry("uptime");
+entry("trace");
+entry("sysinfo"); //here!
+```
+
+**syscall.h**
+
+```c
+// System call numbers
+#define SYS_fork    1
+#define SYS_exit    2
+#define SYS_wait    3
+#define SYS_pipe    4
+#define SYS_read    5
+#define SYS_kill    6
+#define SYS_exec    7
+#define SYS_fstat   8
+#define SYS_chdir   9
+#define SYS_dup    10
+#define SYS_getpid 11
+#define SYS_sbrk   12
+#define SYS_sleep  13
+#define SYS_uptime 14
+#define SYS_open   15
+#define SYS_write  16
+#define SYS_mknod  17
+#define SYS_unlink 18
+#define SYS_link   19
+#define SYS_mkdir  20
+#define SYS_close  21
+#define SYS_trace  22
+#define SYS_sysinfo 23 //here!
+```
+
+**sysall.c**
+
+```c
+extern uint64 sys_chdir(void);
+extern uint64 sys_close(void);
+extern uint64 sys_dup(void);
+extern uint64 sys_exec(void);
+extern uint64 sys_exit(void);
+extern uint64 sys_fork(void);
+extern uint64 sys_fstat(void);
+extern uint64 sys_getpid(void);
+extern uint64 sys_kill(void);
+extern uint64 sys_link(void);
+extern uint64 sys_mkdir(void);
+extern uint64 sys_mknod(void);
+extern uint64 sys_open(void);
+extern uint64 sys_pipe(void);
+extern uint64 sys_read(void);
+extern uint64 sys_sbrk(void);
+extern uint64 sys_sleep(void);
+extern uint64 sys_unlink(void);
+extern uint64 sys_wait(void);
+extern uint64 sys_write(void);
+extern uint64 sys_uptime(void);
+extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);//here!
+
+static uint64 (*syscalls[])(void) = {
+[SYS_fork]    sys_fork,
+[SYS_exit]    sys_exit,
+[SYS_wait]    sys_wait,
+[SYS_pipe]    sys_pipe,
+[SYS_read]    sys_read,
+[SYS_kill]    sys_kill,
+[SYS_exec]    sys_exec,
+[SYS_fstat]   sys_fstat,
+[SYS_chdir]   sys_chdir,
+[SYS_dup]     sys_dup,
+[SYS_getpid]  sys_getpid,
+[SYS_sbrk]    sys_sbrk,
+[SYS_sleep]   sys_sleep,
+[SYS_uptime]  sys_uptime,
+[SYS_open]    sys_open,
+[SYS_write]   sys_write,
+[SYS_mknod]   sys_mknod,
+[SYS_unlink]  sys_unlink,
+[SYS_link]    sys_link,
+[SYS_mkdir]   sys_mkdir,
+[SYS_close]   sys_close,
+[SYS_trace]   sys_trace,
+[SYS_sysinfo] sys_sysinfo,//here!
+};
+```
+
+**syscall.c**
+
+```c
+//记得在头文件加#include"sysinfo.h"
+
+uint64
+sys_sysinfo(void){
+  struct sysinfo info;
+  uint64 addr;
+  struct proc*p=myproc();
+  info.nproc=-1;
+  info.freemem=-2;
+  if(argaddr(0, &addr) < 0)
+    return -1;
+
+  if(copyout(p->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+      return -1;
+
+  return 0;
+}
+```
+
+**kalloc.c**
+
+```c
+//Add funtion
+uint64 acquire_freemem(){
+  struct run *r;
+  uint64 cnt=0;//页表数
+
+  acquire(&kmem.lock);
+  r = kmem.freelist;
+  while(r){
+    r=r->next;
+    cnt++;
+  }
+  release(&kmem.lock);
+
+  return cnt*PGSIZE;
+}
+```
+
+**sysproc.c**
+
+```c
+//引用 acquire_freemem()、acquire_nproc()
+uint64 acquire_freemem();
+uint64 accquire_freemem();
+
+uint64
+sys_sysinfo(void){
+  struct sysinfo info;
+  uint64 addr;
+  struct proc*p=myproc();
+  info.nproc=acquire_nproc();
+  info.freemem=acquire_freemem();
+  if(argaddr(0, &addr) < 0)
+    return -1;
+
+  if(copyout(p->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+      return -1;
+
+  return 0;
+}
+```
+
