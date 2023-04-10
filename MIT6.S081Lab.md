@@ -19,8 +19,7 @@
 ## **[实验指导书](https://pdos.csail.mit.edu/6.S081/2021/labs)**
 
 
-## **[b站指导视频](https://b23.tv/ezFe1Qs)**
-在此隆重感谢大佬的教学视频
+[指导博客]([https://blog.csdn.net/u013577996/article/details/108679997)
 
 ## Lab1 Unix utilities
 
