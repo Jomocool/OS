@@ -16,7 +16,7 @@
 
 
 
-## **[实验指导书](https://pdos.csail.mit.edu/6.S081/2020/labs)**
+## **[实验指导书](https://pdos.csail.mit.edu/6.S081/2021/labs)**
 
 
 ## **[b站指导视频](https://b23.tv/ezFe1Qs)**
@@ -31,8 +31,8 @@ This lab will familiarize you with xv6 and its system calls.
 在前面环境搭配好的情况下，克隆仓库，编译编译器，qemu
 
 ```shell
-$ git clone git://g.csail.mit.edu/xv6-labs-2020
-$ cd xv6-labs-2020
+$ git clone git://g.csail.mit.edu/xv6-labs-2021
+$ cd xv6-labs-2021
 $ git checkout util
 $ make qemu
 ```
