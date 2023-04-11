@@ -126,3 +126,26 @@ exit #再exit就是退出shell回话了
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/40.png)
 
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/41.png)
+
+## 时间日期类
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/42.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/43.png)
+
+## 查找指令
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/44.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/45.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/46.png)
+
+## 压缩和解压
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/47.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/48.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/49.png)
+
