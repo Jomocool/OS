@@ -149,3 +149,17 @@ exit #再exit就是退出shell回话了
 
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/49.png)
 
+## Linux组的介绍
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/50.png)
+
+## 所有者
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/51.png)
+
+## 所有组
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/52.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/53.png)
+
