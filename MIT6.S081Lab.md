@@ -19,7 +19,9 @@
 ## **[实验指导书](https://pdos.csail.mit.edu/6.S081/2021/labs)**
 
 
-[指导博客]([https://blog.csdn.net/u013577996/article/details/108679997)
+## [指导视频](https://www.bilibili.com/video/BV1Qi4y1o7tN?vd_source=cc4b252c81c96c974da321a0c636cc6e)
+
+在此感谢大佬的讲解视频
 
 ## Lab1 Unix utilities
 
