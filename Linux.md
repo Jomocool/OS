@@ -163,3 +163,83 @@ exit #再exit就是退出shell回话了
 
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/53.png)
 
+## 修改所在组
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/54.png)
+
+## Linux_rwx权限
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/55.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/56.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/57.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/58.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/59.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/60.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/61.png)
+
+**案例：**
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/62.png)
+
+```shell
+[root@Jomo01 home]# groupadd police && groupadd bandit
+[root@Jomo01 home]# useradd -g police jack && useradd -g police jerry
+[root@Jomo01 home]# useradd -g bandit xh && useradd -g bandit xq
+[jack@Jomo01 home]$ cd ~
+[jack@Jomo01 ~]$ vim jack.txt
+[jack@Jomo01 ~]$ ll
+总用量 4
+-rw-r--r--. 1 jack police 6 4月  16 15:16 jack.txt
+[jack@Jomo01 ~]$ chmod 640 jack.txt
+[jack@Jomo01 ~]$ ll
+总用量 4
+-rw-r-----. 1 jack police 6 4月  16 15:16 jack.txt
+[jack@Jomo01 ~]$ chmod o=r,g=r jack.txt
+[jack@Jomo01 ~]$ ll
+总用量 4
+-rw-r--r--. 1 jack police 6 4月  16 15:16 jack.txt
+[jack@Jomo01 ~]$ chmod o=r,g+w jack.txt
+[jack@Jomo01 ~]$ ll
+总用量 4
+-rw-rw-r--. 1 jack police 6 4月  16 15:16 jack.txt
+```
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/63.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/64.png)
+
+```shell
+[root@Jomo01 home]# groupadd sx
+[root@Jomo01 home]# groupadd yg
+[root@Jomo01 home]# useradd ts
+[root@Jomo01 home]# useradd wk
+[root@Jomo01 home]# useradd bj
+[root@Jomo01 home]# useradd ss
+[root@Jomo01 home]# passwd ts
+[root@Jomo01 home]# passwd wk
+[root@Jomo01 ~]# passwd bj
+[root@Jomo01 ~]# passwd bj
+[root@Jomo01 ~]# usermod -g yg wk
+[root@Jomo01 ~]# usermod -g yg bj
+[root@Jomo01 ~]# usermod -g sx ts
+[root@Jomo01 ~]# usermod -g sx ss
+[root@Jomo01 ~]# su wk
+[wk@Jomo01 root]$ cd ~
+[wk@Jomo01 ~]$ vim monkey.java
+[wk@Jomo01 ~]$ ll
+总用量 4
+-rw-r--r--. 1 wk yg 12 4月  16 15:41 monkey.java
+[wk@Jomo01 ~]$ chmod g+w monkey.java
+
+对文件夹的rwx：
+r：可以使用ls指令展示目录
+w：可以对文件夹增删
+x：bj和wk是同一个组，如果wk对同组人只开启执行权限x，那么bj进入wk目录后，无法展示目录文件，但是依然可以读写文件
+```
+
