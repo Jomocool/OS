@@ -1436,3 +1436,572 @@ sys_sysinfo(void){
 }
 ```
 
+## Lab3 Page table
+
+### Speed up system calls ([easy](https://pdos.csail.mit.edu/6.S081/2021/labs/guidance.html))
+
+When each process is created, map one read-only page at USYSCALL (a VA defined in `memlayout.h`). At the start of this page, store a `struct usyscall` (also defined in `memlayout.h`), and initialize it to store the PID of the current process. For this lab, `ugetpid()` has been provided on the userspace side and will automatically use the USYSCALL mapping. You will receive full credit for this part of the lab if the `ugetpid` test case passes when running `pgtbltest`.
+
+**proc.h**
+
+```c
+// Per-process state
+struct proc {
+  struct spinlock lock;
+
+  // p->lock must be held when using these:
+  enum procstate state;        // Process state
+  void *chan;                  // If non-zero, sleeping on chan
+  int killed;                  // If non-zero, have been killed
+  int xstate;                  // Exit status to be returned to parent's wait
+  int pid;                     // Process ID
+
+  // wait_lock must be held when using this:
+  struct proc *parent;         // Parent process
+
+  // these are private to the process, so p->lock need not be held.
+  uint64 kstack;               // Virtual address of kernel stack
+  uint64 sz;                   // Size of process memory (bytes)
+  pagetable_t pagetable;       // User page table
+  struct trapframe *trapframe; // data page for trampoline.S
+//--------------------------------------------------------------------------------------------------//
+  struct usyscall *usyscall;   // data page for USYSCALL
+//--------------------------------------------------------------------------------------------------//
+  struct context context;      // swtch() here to run process
+  struct file *ofile[NOFILE];  // Open files
+  struct inode *cwd;           // Current directory
+  char name[16];               // Process name (debugging)
+};
+```
+
+**proc.c**
+
+```c
+// Create a user page table for a given process,
+// with no user memory, but with trampoline pages.
+pagetable_t
+proc_pagetable(struct proc *p)
+{
+  pagetable_t pagetable;
+
+  // An empty page table.
+  pagetable = uvmcreate();
+  if(pagetable == 0)
+    return 0;
+
+  // map the trampoline code (for system call return)
+  // at the highest user virtual address.
+  // only the supervisor uses it, on the way
+  // to/from user space, so not PTE_U.
+  if(mappages(pagetable, TRAMPOLINE, PGSIZE,
+              (uint64)trampoline, PTE_R | PTE_X) < 0){
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+
+  // map the trapframe just below TRAMPOLINE, for trampoline.S.
+  if(mappages(pagetable, TRAPFRAME, PGSIZE,
+              (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+//--------------------------------------------------------------------------------------------------//
+  //map the usyscall just below TRAPFRAME
+  if(mappages(pagetable, USYSCALL, PGSIZE,
+              (uint64)(p->usyscall), PTE_R | PTE_U) < 0){
+    uvmunmap(pagetable,USYSCALL,1,0);
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+//--------------------------------------------------------------------------------------------------//
+  return pagetable;
+}
+
+// Look in the process table for an UNUSED proc.
+// If found, initialize state required to run in the kernel,
+// and return with p->lock held.
+// If there are no free procs, or a memory allocation fails, return 0.
+static struct proc*
+allocproc(void)
+{
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state == UNUSED) {
+      goto found;
+    } else {
+      release(&p->lock);
+    }
+  }
+  return 0;
+
+found:
+  p->pid = allocpid();
+  p->state = USED;
+
+  // Allocate a trapframe page.
+  if((p->trapframe = (struct trapframe *)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+//--------------------------------------------------------------------------------------------------//
+  // Allocate an usyscall page.
+  if((p->usyscall = (struct usyscall *)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+  p->usyscall->pid=p->pid;
+//--------------------------------------------------------------------------------------------------//
+  // An empty user page table.
+  p->pagetable = proc_pagetable(p);
+  if(p->pagetable == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  // Set up new context to start executing at forkret,
+  // which returns to user space.
+  memset(&p->context, 0, sizeof(p->context));
+  p->context.ra = (uint64)forkret;
+  p->context.sp = p->kstack + PGSIZE;
+
+  return p;
+}
+
+static void
+freeproc(struct proc *p)
+{
+  if(p->trapframe)
+    kfree((void*)p->trapframe);
+  p->trapframe = 0;
+//--------------------------------------------------------------------------------------------------//
+  if(p->usyscall)
+    kfree((void*)p->usyscall);
+  p->usyscall=0;
+//--------------------------------------------------------------------------------------------------//
+  if(p->pagetable)
+    proc_freepagetable(p->pagetable, p->sz);
+  p->pagetable = 0;
+  p->sz = 0;
+  p->pid = 0;
+  p->parent = 0;
+  p->name[0] = 0;
+  p->chan = 0;
+  p->killed = 0;
+  p->xstate = 0;
+  p->state = UNUSED;
+}
+
+// Free a process's page table, and free the
+// physical memory it refers to.
+void
+proc_freepagetable(pagetable_t pagetable, uint64 sz)
+{
+//--------------------------------------------------------------------------------------------------//
+  uvmunmap(pagetable,USYSCALL,1,0);
+//--------------------------------------------------------------------------------------------------//
+  uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+  uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmfree(pagetable, sz);
+}
+```
+
+**make qemu**
+
+```shell
+$ pgtbltest
+ugetpid_test starting
+ugetpid_test: OK
+pgaccess_test starting
+pgtbltest: pgaccess_test failed: incorrect access bits set, pid=3
+```
+
+
+
+### Print a page table ([easy](https://pdos.csail.mit.edu/6.S081/2021/labs/guidance.html))
+
+Define a function called `vmprint()`. It should take a `pagetable_t` argument, and print that pagetable in the format described below. Insert `if(p->pid==1) vmprint(p->pagetable)` in exec.c just before the `return argc`, to print the first process's page table. You receive full credit for this part of the lab if you pass the `pte printout` test of `make grade`.
+
+**exec.c**
+
+```c
+#include "types.h"
+#include "param.h"
+#include "memlayout.h"
+#include "riscv.h"
+#include "spinlock.h"
+#include "proc.h"
+#include "defs.h"
+#include "elf.h"
+
+static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
+//--------------------------------------------------------------------------------------------------//
+void vmprint(pagetable_t pagetable,uint64 depth);
+//--------------------------------------------------------------------------------------------------//
+int
+exec(char *path, char **argv)
+{
+  char *s, *last;
+  int i, off;
+  uint64 argc, sz = 0, sp, ustack[MAXARG], stackbase;
+  struct elfhdr elf;
+  struct inode *ip;
+  struct proghdr ph;
+  pagetable_t pagetable = 0, oldpagetable;
+  struct proc *p = myproc();
+
+  begin_op();
+
+  if((ip = namei(path)) == 0){
+    end_op();
+    return -1;
+  }
+  ilock(ip);
+
+  // Check ELF header
+  if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
+    goto bad;
+  if(elf.magic != ELF_MAGIC)
+    goto bad;
+
+  if((pagetable = proc_pagetable(p)) == 0)
+    goto bad;
+
+  // Load program into memory.
+  for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
+    if(readi(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
+      goto bad;
+    if(ph.type != ELF_PROG_LOAD)
+      continue;
+    if(ph.memsz < ph.filesz)
+      goto bad;
+    if(ph.vaddr + ph.memsz < ph.vaddr)
+      goto bad;
+    uint64 sz1;
+    if((sz1 = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0)
+      goto bad;
+    sz = sz1;
+    if((ph.vaddr % PGSIZE) != 0)
+      goto bad;
+    if(loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0)
+      goto bad;
+  }
+  iunlockput(ip);
+  end_op();
+  ip = 0;
+
+  p = myproc();
+  uint64 oldsz = p->sz;
+
+  // Allocate two pages at the next page boundary.
+  // Use the second as the user stack.
+  sz = PGROUNDUP(sz);
+  uint64 sz1;
+  if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
+    goto bad;
+  sz = sz1;
+  uvmclear(pagetable, sz-2*PGSIZE);
+  sp = sz;
+  stackbase = sp - PGSIZE;
+
+  // Push argument strings, prepare rest of stack in ustack.
+  for(argc = 0; argv[argc]; argc++) {
+    if(argc >= MAXARG)
+      goto bad;
+    sp -= strlen(argv[argc]) + 1;
+    sp -= sp % 16; // riscv sp must be 16-byte aligned
+    if(sp < stackbase)
+      goto bad;
+    if(copyout(pagetable, sp, argv[argc], strlen(argv[argc]) + 1) < 0)
+      goto bad;
+    ustack[argc] = sp;
+  }
+  ustack[argc] = 0;
+
+  // push the array of argv[] pointers.
+  sp -= (argc+1) * sizeof(uint64);
+  sp -= sp % 16;
+  if(sp < stackbase)
+    goto bad;
+  if(copyout(pagetable, sp, (char *)ustack, (argc+1)*sizeof(uint64)) < 0)
+    goto bad;
+
+  // arguments to user main(argc, argv)
+  // argc is returned via the system call return
+  // value, which goes in a0.
+  p->trapframe->a1 = sp;
+
+  // Save program name for debugging.
+  for(last=s=path; *s; s++)
+    if(*s == '/')
+      last = s+1;
+  safestrcpy(p->name, last, sizeof(p->name));
+    
+  // Commit to the user image.
+  oldpagetable = p->pagetable;
+  p->pagetable = pagetable;
+  p->sz = sz;
+  p->trapframe->epc = elf.entry;  // initial program counter = main
+  p->trapframe->sp = sp; // initial stack pointer
+  proc_freepagetable(oldpagetable, oldsz);
+//--------------------------------------------------------------------------------------------------//
+  if(p->pid==1)vmprint(p->pagetable,0);//后面在vm.c中定义
+//--------------------------------------------------------------------------------------------------//
+  return argc; // this ends up in a0, the first argument to main(argc, argv)
+
+ bad:
+  if(pagetable)
+    proc_freepagetable(pagetable, sz);
+  if(ip){
+    iunlockput(ip);
+    end_op();
+  }
+  return -1;
+}
+```
+
+**vm.c**
+
+```c
+//--------------------------------------------------------------------------------------------------//
+static char *prefix[]={
+  [0]="..",
+  [1]=".. ..",
+  [2]=".. .. .."
+};
+
+void vmprint(pagetable_t pagetable,uint64 depth){
+  if(depth>2)return;
+  if(depth==0){
+    printf("page table %p\n",pagetable);
+  }
+
+  char *buf=prefix[depth];
+
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V){//如果是有效的pte
+      uint64 child = PTE2PA(pte);
+      printf("%s%d: pte %p pa %p\n",buf,i,pte,child);
+      vmprint((pagetable_t)child,depth+1);
+    }
+  }
+}
+//--------------------------------------------------------------------------------------------------//
+```
+
+**make qemu**
+
+```shell
+xv6 kernel is booting
+
+hart 2 starting
+hart 1 starting
+page table 0x0000000087f6e000
+..0: pte 0x0000000021fda801 pa 0x0000000087f6a000
+.. ..0: pte 0x0000000021fda401 pa 0x0000000087f69000
+.. .. ..0: pte 0x0000000021fdac1f pa 0x0000000087f6b000
+.. .. ..1: pte 0x0000000021fda00f pa 0x0000000087f68000
+.. .. ..2: pte 0x0000000021fd9c1f pa 0x0000000087f67000
+..255: pte 0x0000000021fdb401 pa 0x0000000087f6d000
+.. ..511: pte 0x0000000021fdb001 pa 0x0000000087f6c000
+.. .. ..509: pte 0x0000000021fdd813 pa 0x0000000087f76000
+.. .. ..510: pte 0x0000000021fddc07 pa 0x0000000087f77000
+.. .. ..511: pte 0x0000000020001c0b pa 0x0000000080007000
+init: starting sh
+```
+
+### Detecting which pages have been accessed ([hard](https://pdos.csail.mit.edu/6.S081/2021/labs/guidance.html))
+
+Your job is to implement `pgaccess()`, a system call that reports which pages have been accessed. The system call takes three arguments. First, it takes the starting virtual address of the first user page to check. Second, it takes the number of pages to check. Finally, it takes a user address to a buffer to store the results into a bitmask (a datastructure that uses one bit per page and where the first page corresponds to the least significant bit). You will receive full credit for this part of the lab if the `pgaccess` test case passes when running `pgtbltest`.
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081Lab-img/6.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081Lab-img/7.png)
+
+**pgtbltest.c**
+
+先看pgacess_test()
+
+```c
+void
+pgaccess_test()
+{
+  char *buf;
+  unsigned int abits;//32位，每一位对应所代表的页表是否被访问。(0：未访问),(1：已访问)
+  printf("pgaccess_test starting\n");
+  testname = "pgaccess_test";
+  buf = malloc(32 * PGSIZE);//分配32个页表，每个页表4096B
+  if (pgaccess(buf, 32, &abits) < 0)
+    err("pgaccess failed");
+  //以下三步操作表明将访问PGSIZE * 1、PGSIZE * 2、PGSIZE * 30这三个页表
+  buf[PGSIZE * 1] += 1;
+  buf[PGSIZE * 2] += 1;
+  buf[PGSIZE * 30] += 1;
+    
+  if (pgaccess(buf, 32, &abits) < 0)
+    err("pgaccess failed");
+  //(1 << 1) | (1 << 2) | (1 << 30)：第1/2/30位是1，其余全是0，代表只访问了这3张页表，刚好对应上面，或是加运算
+  if (abits != ((1 << 1) | (1 << 2) | (1 << 30)))
+    err("incorrect access bits set");
+  free(buf);
+  printf("pgaccess_test: OK\n");
+}
+```
+
+Some hints:
+
+- Start by implementing `sys_pgaccess()` in `kernel/sysproc.c`.
+- You'll need to parse arguments using `argaddr()` and `argint()`.
+- For the output bitmask, it's easier to store a temporary buffer in the kernel and copy it to the user (via `copyout()`) after filling it with the right bits.
+- It's okay to set an upper limit on the number of pages that can be scanned.
+- `walk()` in `kernel/vm.c` is very useful for finding the right PTEs.
+- You'll need to define `PTE_A`, the access bit, in `kernel/riscv.h`. Consult the RISC-V manual to determine its value.
+- Be sure to clear `PTE_A` after checking if it is set. Otherwise, it won't be possible to determine if the page was accessed since the last time `pgaccess()` was called (i.e., the bit will be set forever).
+- `vmprint()` may come in handy to debug page tables.
+
+**sysproc.c**
+
+```c
+#ifdef LAB_PGTBL
+int
+sys_pgaccess(void)
+{
+  // lab pgtbl: your code here.
+//--------------------------------------------------------------------------------------------------//
+  // todo 
+  uint64 addr;
+  uint64 len;
+  uint64 bitmask
+  if(argaddr(0,&addr)<0){//0：第[一]个参数
+    return -1;
+  }
+  if(argaddr(1,&len)<0){//1：第[二]个参数
+    return -1;
+  }
+  if(argaddr(2,&bitmask)<0){//2：第[三]个参数
+    return -1;
+  }
+    if(len>32||len<0){
+    return -1;
+  }
+  
+  int res=0x1111;
+  //计算res
+  struct proc *p=myproc();//获取当前进程
+  for(int i=0;i<len;i++){
+    int va=addr+i*PGSIZE;//计算当前页表的虚拟地址
+    int Abit=vm_pgaccess(p->pagetable,va);//p->pagetable里va对应的页表是否被访问
+    res=res|(Abit<<i);//因为是第i个页表，所以左移i位对应该页表
+  }
+  
+  if(copyout(p->pagetable,bitmask,(char*)&res,sizeof(res))<0){//将res从kernel传给user
+    return -1;
+  }
+//--------------------------------------------------------------------------------------------------//
+  return 0;
+}
+#endif
+```
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081Lab-img/8.png)
+
+**riscv.h**
+
+```c
+#define PTE_V (1L << 0) // valid
+#define PTE_R (1L << 1)
+#define PTE_W (1L << 2)
+#define PTE_X (1L << 3)
+#define PTE_U (1L << 4) // 1 -> user can access
+//--------------------------------------------------------------------------------------------------//
+#define PTE_A (1L << 6) //define PTE_A, the access bit
+//--------------------------------------------------------------------------------------------------//
+```
+
+**vm.c**
+
+定义vm_pgaccess()
+
+```c
+//--------------------------------------------------------------------------------------------------//
+int vm_pgaccess(pagetable_t pagetable,uint64 va){
+  pte_t *pte;
+
+  if(va >= MAXVA)
+    return 0;
+
+  pte = walk(pagetable, va, 0);
+  if(pte == 0)
+    return 0;
+  if((*pte & PTE_A)!=0){
+    *pte = *pte & (~PTE_A);//复位成0，clear 6th flag(PTE_A)
+    return 1;
+  }
+  return 0;
+}
+//--------------------------------------------------------------------------------------------------//
+```
+
+**defs.h**
+
+添加vm_pgaccess()的声明，因为是在vm.c中定义实现，所以声明在相应区域
+
+```c
+// vm.c
+void            kvminit(void);
+void            kvminithart(void);
+void            kvmmap(pagetable_t, uint64, uint64, uint64, int);
+int             mappages(pagetable_t, uint64, uint64, uint64, int);
+pagetable_t     uvmcreate(void);
+void            uvminit(pagetable_t, uchar *, uint);
+uint64          uvmalloc(pagetable_t, uint64, uint64);
+uint64          uvmdealloc(pagetable_t, uint64, uint64);
+int             uvmcopy(pagetable_t, pagetable_t, uint64);
+void            uvmfree(pagetable_t, uint64);
+void            uvmunmap(pagetable_t, uint64, uint64, int);
+void            uvmclear(pagetable_t, uint64);
+uint64          walkaddr(pagetable_t, uint64);
+int             copyout(pagetable_t, uint64, char *, uint64);
+int             copyin(pagetable_t, char *, uint64, uint64);
+int             copyinstr(pagetable_t, char *, uint64, uint64);
+//--------------------------------------------------------------------------------------------------//
+int             vm_pgaccess(pagetable_t,uint64);
+//--------------------------------------------------------------------------------------------------//
+```
+
+**make qemu**
+
+```shell
+$ pgtbltest
+ugetpid_test starting
+ugetpid_test: OK
+pgaccess_test starting
+pgaccess_test: OK
+pgtbltest: all tests succeeded
+```
+
+**make grade**
+
+```shell
+$ make qemu-gdb
+(8.4s) 
+== Test   pgtbltest: ugetpid == 
+  pgtbltest: ugetpid: OK 
+== Test   pgtbltest: pgaccess == 
+  pgtbltest: pgaccess: OK 
+== Test pte printout == 
+$ make qemu-gdb
+pte printout: OK (2.0s)
+```
+
+**思考：**
+
+每个页表对应每个进程，判断每个进程是否被access，可以通过判断对应页表是否被访问过，而每个页表是否被访问过可以通过对应的PTE来判断，因为PTE中的A bit就是来判断是否被access
+
