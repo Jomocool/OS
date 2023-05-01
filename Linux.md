@@ -243,3 +243,107 @@ w：可以对文件夹增删
 x：bj和wk是同一个组，如果wk对同组人只开启执行权限x，那么bj进入wk目录后，无法展示目录文件，但是依然可以读写文件
 ```
 
+## Linux_crond快速入门
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/65.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/66.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/67.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/68.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/69.png)
+
+**应用实例**
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/70.png)
+
+```shell
+案例1：
+#编辑crond任务调度
+crontab -e
+#每隔1分钟就将date重定义输出到mydate文件里，内容如下
+*/1 * * * * date >> /tmp/mydate
+
+案例2：
+#1.写一个shell脚本my.sh，内容如下：
+date >> /home/mycal
+cal >> /home/mycal
+#2.目前没有my.sh的执行权限，手动添加，x就是执行权限
+chmod u+x my.sh
+#3.执行my.sh，home目录下出现mycal文件
+./my.sh
+#4.目标：每隔一分钟执行一次my.sh
+crontab -e
+#内容如下：
+*/1 * * * * /home/my.sh
+
+案例3：
+#1.编辑crond
+crontab -e
+#2.内容如下：(0 2)->(2时0分，24h制)
+0 2 * * * mysqldump -u root -proot testdb > /home/db.bak
+```
+
+## Linux_at任务调度机制
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/71.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/72.png)    
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/73.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/74.png)
+
+```shell
+#检测atd是否在运行
+ps -ef | grep atd
+```
+
+**应用实例**
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/75.png)
+
+```shell
+案例1：
+at 5pm + 2 days
+#输入
+at> /bin/ls /home
+#输入后，连续输入ctrl+d两次！！
+#输出
+at> /bin/ls /home<EOT>
+job 1 at Wed May  3 17:00:00 2023
+
+案例2：
+#查询
+atq
+#输出
+1	Wed May  3 17:00:00 2023 a root
+
+案例3：
+at 5pm tomorrow
+#输入
+at> date > /root/date.log
+#输出
+at> date > /root/date100.log<EOT>
+job 3 at Tue May  2 17:00:00 2023
+
+案例4：
+at now + 2 minutes
+#输入
+at> date > /root/date200.log
+#输出
+at> date > /root/date200.log<EOT>
+job 4 at Mon May  1 10:49:00 2023
+
+案例5：
+#删掉编号是1的任务
+atrm 1
+```
+
+**总结：**
+
+- crond任务调度是周期性的
+- at任务调度是一次性的
+
