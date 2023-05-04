@@ -195,3 +195,98 @@ page table提供了一层抽象，即虚拟地址到物理地址的映射，这�
 | 未被使用的也需要提前开辟内存空间 | 用多少就开辟多少内存空间 |
 
 ![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081-img/6.png)
+
+## Lecture5 - RISC-V Calling Convention and Stack Frames
+
+**RISC-V处理器 => RISC-V指令集，每条指令都有一个相关联的二进制编码或操作码**
+
+汇编语言有多种，RISC-V的汇编语言不能够在Linux上运行，大多数现代计算机都运行在x86和x86-64处理器上。其实就是指令集的不同
+
+寄存器之所以重要是因为汇编代码并不是在内存上执行，而是在寄存器上执行。寄存器是用来进行任何运算和数据读取的最快的方式
+
+如果需要存放数据的数量大于寄存器个数的时候，就需要使用内存了
+
+**Caller saved：**Not preserved across function call
+
+**Callee saved：**Preserved across function call
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081-img/7.png)
+
+堆栈之所以重要，是因为它使得我们的函数变得有组织。且能够正常返回
+
+每执行一次函数调用就会产生一个Stack Frame，每次调用一个函数，函数都会为自己创建一个Stack Frame，函数通过移动Stack Pointer来完成Stack Frame的空间分配。对于Stack来说，是从高地址开始向低地址使用，所以栈总是向下扩展。
+函数栈帧包含寄存器、局部变量，如果参数寄存器用完了，额外的参数就会出现在栈上。所以Stack Frame大小并不总是一样。不同的函数有不同数量的本地变量，不同的寄存器
+
+两件确定的事：
+1.Return address总是会出现在Stack Frame的第一位
+
+2.指向前一个Stack Frame的指针也会出现在栈中固定位置
+
+Stack Frame有两个重要的寄存器
+
+1.SP(Stack Pointer)：它指向了当前Stack Frame的底部并代表了当前Stack Frame的位置
+
+2.FP(Frame Pointer)：它指向了当前Stack Frame的顶部
+
+
+
+leaf function：指不调用别的函数的函数
+
+
+
+![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081-img/8.png)
+
+1.开始减16，开辟16字节大小的栈，因为不想覆盖原来在Stack Pointer位置的数据
+
+2.函数结束后，将sp指向原先的栈
+
+
+
+Struct里的成员变量一般都是存储于连续地址的
+
+
+
+## Lecture 6 - Isolation & System Call Entry_Exit
+
+### 6.1Trap机制
+
+1. 程序运行何时发生用户空间和内核空间的切换：
+
+   - 程序执行系统调用
+   - 程序出现了类似page fault、运算时除以0的错误
+   - 一个设备出发了中断使得当前程序运行需要相应内核设备驱动
+
+2. 用户空间和内核空间的切换通常被称为trap，trap的实现细节对于实现安全隔离和性能十分重要。同时因为很多应用程序，要么因为系统调用，要么因为page fault，都会频繁地切换到内核中。所以，trap机制要尽可能的简单。
+
+3. 程序从只拥有user权限并且位于用户空间的Shell，切换到拥有supervisor权限的内核，这个过程中，硬件的状态十分重要，因为许多工作都是将硬件从适合运行用户应用程序的状态，改变到适合运行内核代码的状态
+
+4. 32个寄存器：
+
+   - stack pointer：堆栈寄存器（stack register）
+   - 程序计数器（Program Counter Register）：表明了当前是supervisor mode还是user mode
+   - SATP寄存器（Supervisor Address Translation and Protection）：控制CPU工作方式，包含了指向page table的物理内存地址
+   - STVEC寄存器（Supervisor Trap Vector Base Address Register）：指向了内核中处理trap的指令的起始地址
+   - SEPC寄存器：在trap的过程中保存程序计数器的值
+   - SSRATCH寄存器（Supervisor Scratch Register）
+
+   这些寄存器表明了执行系统调用时计算机的状态
+
+5. 在trap的最开始，CPU所有状态都设置成运行用户代码而不是内核代码。在trap处理的过程中，实际需要改变一些状态，才可以运行系统内核中普通的C程序。过程如下：
+
+   - 需要保存32个用户寄存器。因为后续需要恢复用户应用程序的执行，尤其是当用户程序被随机的中断所打断时。内核能够响应中断，同时用户程序能够在无感知的情况下恢复并继续运行。
+   - 程序计数器需要保存，地位和用户寄存器一样。因为我们需要在用户程序运行中断的位置继续执行用户程序
+   - 需要将mode转变为supervisor mode，因为需要使用内核中各种各样的特权指令
+   - 需要将SATP指向kernel page table。因为SATP寄存器目前正指向user page table，其只包含了用户程序所需要的内存映射和一两个其他映射，并无包含完整的内核数据的内存映射。
+   - 需要将堆栈寄存器指向位于内核的一个地址，因为需要一个堆栈来调用内核的C函数
+   - 当设置好之后，所有的硬件状态都适合在内核中使用，就跳入内核的C代码
+
+6. trap中涉及到的硬件和内核机制不能依赖任何来自用户空间的东西，否则有可能会破坏安全性。因此xv6的trap机制不会查看这些寄存器，而只是保存起来。同时，trap应对用户代码透明，这样也更容易写用户代码。即使这样，也要时刻小心用户代码可能会尝试欺骗它。
+
+7. 在supervisor mode下：
+
+   - SATP寄存器：page table指针
+   - STVEC寄存器：处理trap的内核指令地址
+   - SEPC寄存器：保存当发生trap时的程序计数器
+   - SSCRATCH
+   - 可以使用PTE_U标志位是0的PTE，而user mode只有在PTE_U是1的时候才可以使用PTE
+   - 不可以读写任意物理地址，像普通的用户代码，也需要通过page table来访问内存。如果一个虚拟地址并不在当前由SATP指向的page table中，又或者SATP指向的page table中PTE_U=1，那么supervisor mode不能使用那个地址。如果一个虚拟地址并不在当前由SATP指向的page table中，又或者SATP指向的page table中PTE_U=1，那么supervisor mode不能使用那个地址。
