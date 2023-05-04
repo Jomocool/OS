@@ -347,3 +347,30 @@ atrm 1
 - crond任务调度是周期性的
 - at任务调度是一次性的
 
+## Linux_磁盘分区机制
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/76.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/77.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/78.png)
+
+**Linux_增加磁盘应用实例**
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/79.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/80.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/81.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/82.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/83.png)
+
+**磁盘情况查询**
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/84.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/85.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/86.png)
