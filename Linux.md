@@ -374,3 +374,27 @@ atrm 1
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/85.png)
 
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/86.png)
+## Linux_NAT网络原理图
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/87.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/88.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/89.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/90.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/91.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/92.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/93.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/94.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/95.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/96.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/97.png)
+
