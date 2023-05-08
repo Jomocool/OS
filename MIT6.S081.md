@@ -290,3 +290,119 @@ Struct里的成员变量一般都是存储于连续地址的
    - SSCRATCH
    - 可以使用PTE_U标志位是0的PTE，而user mode只有在PTE_U是1的时候才可以使用PTE
    - 不可以读写任意物理地址，像普通的用户代码，也需要通过page table来访问内存。如果一个虚拟地址并不在当前由SATP指向的page table中，又或者SATP指向的page table中PTE_U=1，那么supervisor mode不能使用那个地址。如果一个虚拟地址并不在当前由SATP指向的page table中，又或者SATP指向的page table中PTE_U=1，那么supervisor mode不能使用那个地址。
+### 6.2 Trap代码执行流程
+
+1. 从Shell的角度看，Shell调用write系统调用实际上就是个Shell代码的C函数调用，然后write通过执行ECALL指令来执行系统调用。ECALL指令会切换到具有supervisor mode的内核中。在此过程中，内核中执行的第一个指令是一个由汇编语言写的函数，叫uservec。之后，在这个汇编函数中，代码执行跳转到了由C语言实现的函数usertrap中。接着在usertrap这个C函数中，执行了syscall函数，此函数在一个表单中，根据传入的代表系统调用的数字进行查找，并在内核中执行具体实现了系统调用功能的函数。在这里就是sys_write，它会将要显示的数据输出到console上，完成后返回给syscall。
+2. 因为相当于在ECALL之后中断了用户代码的执行，为了恢复用户代码的执行，在syscall函数中，会调用一个函数叫做usertrapret，此函数完成了部分方便在C代码中实现返回用户空间的工作。此外，还有一些工作只能在汇编语言中完成，存在于trampoline.s文件中的userret函数中。最终，在这个汇编函数中会调用机器指令返回到用户空间，并且恢复ECALL之后的用户程序的执行。
+3. vm.c中的所有函数都是内核中的一部分，所以运行在supervisor mode下
+4. vm.c里的函数直接访问物理内存。能这么做的原因是，内核在page table中设置好了各个PTE。当内核接收到一个读写虚拟内存地址的请求时，会通过kernel page table将这个虚拟内存地址翻译成与之等价的物理内存地址，再完成读写。但是知道trap机制切换到内核之前，这些映射关系都不可用，因为在此之前，我们使用的仍然是user page table
+5. 实际上很多操作系统都提供这种叫做内存映射文件（Memory-mapped file access）的机制，在这个机制里面通过page table，可以将用户空间的虚拟地址空间，对应到文件内容，这样你就可以通过内存地址直接读写文件。实际上很多操作系统都提供这种叫做内存映射文件（Memory-mapped file access）的机制，在这个机制里面通过page table，**可以将用户空间的虚拟地址空间，对应到文件内容**，这样你就可以通过内存地址直接读写文件。对于许多程序来说，这个机制的确会比直接调用read/write系统调用要快的多。对于许多程序来说，这个机制的确会比直接调用read/write系统调用要快的多。
+
+### 6.3 ECALL指令之前的状态
+
+1. 运行sh.c
+
+   ![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081-img/9.png)
+
+   选中的行是一个write系统调用，将"$"写入到文件描述符2。
+
+2. Shell调用write时，实际上调用的是关联到Shell的一个库函数
+
+   ![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081-img/10.png)
+
+   上面几行代码是实际调用的write函数的实现，首先将SYS_write加载到a7寄存器，SYS_write是常量16，也就是告诉内核我要运行第16个系统调用，这个系统调用正好是write，之后调用ecall指令，从这里开始代码执行跳转到了内核，内核完成工作后代码执行会返回用户空间，继续执行ecall之后的指令，也就是ret，最终返回到Shell用户代码中。
+
+3. 用户空间所有地址都比较小，一旦进入内核后，内核会使用大得多的内存地址。
+
+4. 系统调用的时间点会有大量状态的变更，其中一个最重要的变更状态，且在它变更之前我们仍对它有依赖的，就是当前的page table。
+
+5. attr列式PTE的标志位，rwx表示这个page可读、可写、可执行。u表示PET_U标志位是否被设置，用户代码只能访问U标志位被设置了的PTE。再下一位标志位是Global。再下一个标志位是a(accessed)，表明这条PTE是否被使用过。d(dirty)表明这条PTE是否被写过。
+
+   ![](https://github.com/Jomocool/Operator-System/blob/main/MIT6.S081-img/11.png)
+
+### 6.4 ECALL指令之后的状态
+
+1. 查看程序计数器，已经在supervisor mode
+
+2. page table还没有改变
+
+3. 寄存器的值也还没有改变，仍是用户程序的数据，因此要十分小心，在寄存器的数据保存到某处之前，不能使用任何寄存器，否则无法恢复寄存器数据，后续返回用户程序执行时就会出错
+
+4. 即使trampoline page是在用户地址空间的user page table完成的映射，用户代码不能写它，因为这些page对应的PTE并没有设置PTE_u标志位。这也是为什么trap机制是安全的。即使trampoline page是在用户地址空间的user page table完成的映射，用户代码不能写它，因为这些page对应的PTE并没有设置PTE_u标志位。这也是为什么trap机制是安全的。
+
+5. ecall只会改变三件事：
+
+   第一，ecall将代码从user mode改到supervisor mode。
+
+   第二，ecall将程序计数器的值保存在了SEPC寄存器。
+
+   第三，ecall会跳转到STVEC寄存器指向的指令。第三，ecall会跳转到STVEC寄存器指向的指令。
+
+6. 接下来：
+
+   第一，保存32个用户寄存器的内容
+
+   第二，切换到kernel page table
+
+   第三，创建或找到kernel stack，并将Stack Pointer寄存器的内容指向那个kernel stack，这样才能给C代码提供栈。
+
+   第四，还需要跳转到内核中C代码的某些合理的位置
+
+   ecall不会为我们做上面的任何一件事。但是可以通过修改硬件让ecall完成这些工作，而不是交给软件来做。实际上，有的机器在执行系统调用时，会在硬件中完成所有这些工作。但是RISC-V并不会，RISC-V秉持了这样一个观点：ecall只完成尽量少必须要完成的工作，其他的工作都交给软件完成。这里的原因是，RISC-V设计者想要为软件和操作系统的程序员提供最大的灵活性，这样他们就能按照他们想要的方式开发操作系统。所以你可以这样想，尽管XV6并没有使用这里提供的灵活性，但是一些其他的操作系统用到了。实际上，有的机器在执行系统调用时，会在硬件中完成所有这些工作。但是RISC-V并不会，RISC-V秉持了这样一个观点：ecall只完成尽量少必须要完成的工作，其他的工作都交给软件完成。这里的原因是，RISC-V设计者想要为软件和操作系统的程序员提供最大的灵活性，这样他们就能按照他们想要的方式开发操作系统。所以你可以这样想，尽管XV6并没有使用这里提供的灵活性，但是一些其他的操作系统用到了。
+
+   一些原因：
+
+   - 在这里，对于某些不需要切换页表的系统调用就不会每次都切换页表了，提高了效率，因为切换页表的代价比较高。
+   - 某些操作系统同时将user和kernel的虚拟地址映射到一个page table中，这样在user和kernel之间切换时根本就不用切换page table。对于这样的操作系统来说，如果ecall切换了page table那将会是一种浪费，并且也减慢了程序的运行。某些操作系统同时将user和kernel的虚拟地址映射到一个page table中，这样在user和kernel之间切换时根本就不用切换page table。对于这样的操作系统来说，如果ecall切换了page table那将会是一种浪费，并且也减慢了程序的运行。
+   - 或许在一些系统调用过程中，一些寄存器不用保存，而哪些寄存器需要保存，哪些不需要，取决于于软件，编程语言，和编译器。通过不保存所有的32个寄存器或许可以节省大量的程序运行时间，所以你不会想要ecall迫使你保存所有的寄存器。或许在一些系统调用过程中，一些寄存器不用保存，而哪些寄存器需要保存，哪些不需要，取决于于软件，编程语言，和编译器。通过不保存所有的32个寄存器或许可以节省大量的程序运行时间，所以你不会想要ecall迫使你保存所有的寄存器。
+   - 最后，对于某些简单的系统调用或许根本就不需要任何stack，所以对于一些非常关注性能的操作系统，ecall不会自动为你完成stack切换是极好的。最后，对于某些简单的系统调用或许根本就不需要任何stack，所以对于一些非常关注性能的操作系统，ecall不会自动为你完成stack切换是极好的。
+
+   所以，ecall尽量的简单可以提升软件设计的灵活性。所以，ecall尽量的简单可以提升软件设计的灵活性。
+
+7. ecall是CPU指令，自然无法在gdb看到具体内容。ecall只会更新CPU中的mode标志位为supervisor，并且设置程序计数器成STVEC寄存器内的值。在进入到用户空间之前，内核会将trampoline page的地址存在STVEC寄存器中。所以ecall的下一条指令的位置是STVEC指向的地址，也就是trampoline page的起始地址。ecall只会更新CPU中的mode标志位为supervisor，并且设置程序计数器成STVEC寄存器内的值。在进入到用户空间之前，内核会将trampoline page的地址存在STVEC寄存器中。所以ecall的下一条指令的位置是STVEC指向的地址，也就是trampoline page的起始地址。
+
+### 6.5 uservec函数
+
+1. 在一些其他的机器中，我们或许直接就将32个寄存器中的内容写到物理内存中某些合适的位置。但是我们不能在RISC-V中这样做，因为在RISC-V中，supervisor mode下的代码不允许直接访问物理内存。所以我们只能使用page table中的内容，但是从前面的输出来看，page table中也没有多少内容。在一些其他的机器中，我们或许直接就将32个寄存器中的内容写到物理内存中某些合适的位置。但是我们不能在RISC-V中这样做，因为在RISC-V中，supervisor mode下的代码不允许直接访问物理内存。所以我们只能使用page table中的内容，但是从前面的输出来看，page table中也没有多少内容。
+
+2. 虽然XV6并没有使用，但是另一种可能的操作是，直接将SATP寄存器指向kernel page table，之后我们就可以直接使用所有的kernel mapping来帮助我们存储用户寄存器。这是合法的，因为supervisor mode可以更改SATP寄存器。但是在trap代码当前的位置，也就是trap机制的最开始，我们并不知道kernel page table的地址。并且更改SATP寄存器的指令，要求写入SATP寄存器的内容来自于另一个寄存器。所以，为了能执行更新page table的指令，我们需要一些空闲的寄存器，这样我们才能先将page table的地址存在这些寄存器中，然后再执行修改SATP寄存器的指令。虽然XV6并没有使用，但是另一种可能的操作是，直接将SATP寄存器指向kernel page table，之后我们就可以直接使用所有的kernel mapping来帮助我们存储用户寄存器。这是合法的，因为supervisor mode可以更改SATP寄存器。但是在trap代码当前的位置，也就是trap机制的最开始，我们并不知道kernel page table的地址。并且更改SATP寄存器的指令，要求写入SATP寄存器的内容来自于另一个寄存器。所以，为了能执行更新page table的指令，我们需要一些空闲的寄存器，这样我们才能先将page table的地址存在这些寄存器中，然后再执行修改SATP寄存器的指令。
+
+3. 对于保存用户寄存器，XV6在RISC-V上的实现包括了两个部分。第一个部分是，XV6在每个user page table映射了trapframe page，这样每个进程都有自己的trapframe page。这个page包含了很多有趣的数据，但是现在最重要的数据是用来保存用户寄存器的32个空槽位。所以，在trap处理代码中，现在的好消息是，我们在user page table有一个之前由kernel设置好的映射关系，这个映射关系指向了一个可以用来存放这个进程的用户寄存器的内存位置。这个位置的虚拟地址总是0x3ffffffe000。对于保存用户寄存器，XV6在RISC-V上的实现包括了两个部分。第一个部分是，XV6在每个user page table映射了trapframe page，这样每个进程都有自己的trapframe page。这个page包含了很多有趣的数据，但是现在最重要的数据是用来保存用户寄存器的32个空槽位。所以，在trap处理代码中，现在的好消息是，我们在user page table有一个之前由kernel设置好的映射关系，这个映射关系指向了一个可以用来存放这个进程的用户寄存器的内存位置。这个位置的虚拟地址总是0x3ffffffe000。
+
+4. 所以，如何保存用户寄存器的一半答案是，内核非常方便的将trapframe page映射到了每个user page table。
+
+   另一半的答案在于我们之前提过的SSCRATCH寄存器。这个由RISC-V提供的SSCRATCH寄存器，就是为接下来的目的而创建的。在进入到user space之前，内核会将trapframe page的地址保存在这个寄存器中，也就是0x3fffffe000这个地址。更重要的是，RISC-V有一个指令允许交换任意两个寄存器的值。而SSCRATCH寄存器的作用就是保存另一个寄存器的值，并将自己的值加载给另一个寄存器。
+
+5. 一台机器总是从内核开始运行的，当机器启动的时候，它就是在内核中。 任何时候，不管是进程第一次启动还是从一个系统调用返回，进入到用户空间的唯一方法是就是执行sret指令。sret指令是由RISC-V定义的用来从supervisor mode转换到user mode。所以，在任何用户代码执行之前，内核会执行fn函数，并设置好所有的东西，例如SSCRATCH，STVEC寄存器。一台机器总是从内核开始运行的，当机器启动的时候，它就是在内核中。 任何时候，不管是进程第一次启动还是从一个系统调用返回，进入到用户空间的唯一方法是就是执行sret指令。sret指令是由RISC-V定义的用来从supervisor mode转换到user mode。所以，在任何用户代码执行之前，内核会执行fn函数，并设置好所有的东西，例如SSCRATCH，STVEC寄存器。
+
+6. trampoline page在user page table中的映射与kernel page table中的映射是完全一样的。这两个page table中其他所有的映射都是不同的，只有trampoline page的映射是一样的，因此我们在切换page table时，寻址的结果不会改变，我们实际上就可以继续在同一个代码序列中执行程序而不崩溃。这是trampoline page的特殊之处，它同时在user page table和kernel page table都有相同的映射关系。trampoline page在user page table中的映射与kernel page table中的映射是完全一样的。这两个page table中其他所有的映射都是不同的，只有trampoline page的映射是一样的，因此我们在切换page table时，寻址的结果不会改变，我们实际上就可以继续在同一个代码序列中执行程序而不崩溃。这是trampoline page的特殊之处，它同时在user page table和kernel page table都有相同的映射关系。之所以叫trampoline page，是因为你某种程度在它上面“弹跳”了一下，然后从用户空间走到了内核空间。之所以叫trampoline page，是因为你某种程度在它上面“弹跳”了一下，然后从用户空间走到了内核空间。
+
+### 6.6 usertrap函数
+
+1. 当程序还在内核中执行时，我们可能切换到另一个进程，并进入到那个程序的用户空间，然后那个进程可能再调用一个系统调用进而导致SEPC寄存器的内容被覆盖。所以，我们需要保存当前进程的SEPC寄存器到一个与该进程关联的内存中，这样这个数据才不会被覆盖。当程序还在内核中执行时，我们可能切换到另一个进程，并进入到那个程序的用户空间，然后那个进程可能再调用一个系统调用进而导致SEPC寄存器的内容被覆盖。所以，我们需要保存当前进程的SEPC寄存器到一个与该进程关联的内存中，这样这个数据才不会被覆盖。
+
+### 6.7 usertrapret函数
+
+1. usertrap函数的最后调用了usertrapret函数。它首先关闭了中断。我们之前在系统调用的过程中是打开了中断的，这里关闭中断是因为我们将要更新STVEC寄存器来指向用户空间的trap处理代码，而之前在内核中的时候，我们指向的是内核空间的trap处理代码它首先关闭了中断。我们之前在系统调用的过程中是打开了中断的，这里关闭中断是因为我们将要更新STVEC寄存器来指向用户空间的trap处理代码，而之前在内核中的时候，我们指向的是内核空间的trap处理代码。我们关闭中断因为当我们将STVEC更新到指向用户空间的trap处理代码时，我们仍然在内核中执行代码。如果这时发生了一个中断，那么程序执行会走向用户空间的trap处理代码，即便我们现在仍然在内核中，出于各种各样具体细节的原因，这会导致内核出错。所以我们这里关闭中断。我们关闭中断因为当我们将STVEC更新到指向用户空间的trap处理代码时，我们仍然在内核中执行代码。如果这时发生了一个中断，那么程序执行会走向用户空间的trap处理代码，即便我们现在仍然在内核中，出于各种各样具体细节的原因，这会导致内核出错。所以我们这里关闭中断。
+
+2. 现在我们在usertrapret函数中现在我们在usertrapret函数中，填入trapframe的内容：
+
+   - 存储了kernel page table的指针
+
+   - 存储了当前用户进程的kernel stack
+
+   - 存储了usertrap函数的指针，这样trampoline代码才能跳转到这个函数
+   - 从tp寄存器中读取当前的CPU核编号，并存储在trapframe中，这样trampoline代码才能恢复这个数字，因为用户代码可能会修改这个数字从tp寄存器中读取当前的CPU核编号，并存储在trapframe中，这样trampoline代码才能恢复这个数字，因为用户代码可能会修改这个数字
+
+3. 接下来我们要设置SSTATUS寄存器，这是一个控制寄存器。这个寄存器的SPP bit位控制了sret指令的行为，该bit为0表示下次执行sret的时候，我们想要返回user mode而不是supervisor mode。这个寄存器的SPIE bit位控制了，在执行完sret之后，是否打开中断。因为我们在返回到用户空间之后，我们的确希望打开中断，所以这里将SPIE bit位设置为1。修改完这些bit位之后，我们会把新的值写回到SSTATUS寄存器。接下来我们要设置SSTATUS寄存器，这是一个控制寄存器。这个寄存器的SPP bit位控制了sret指令的行为，该bit为0表示下次执行sret的时候，我们想要返回user mode而不是supervisor mode。这个寄存器的SPIE bit位控制了，在执行完sret之后，是否打开中断。因为我们在返回到用户空间之后，我们的确希望打开中断，所以这里将SPIE bit位设置为1。修改完这些bit位之后，我们会把新的值写回到SSTATUS寄存器。
+
+4. 接下来，我们根据user page table地址生成相应的SATP值，这样我们在返回到用户空间的时候才能完成page table的切换。实际上，我们会在汇编代码trampoline中完成page table的切换，并且也只能在trampoline中完成切换，因为只有trampoline中代码是同时在用户和内核空间中映射。但是我们现在还没有在trampoline代码中，我们现在还在一个普通的C函数中，所以这里我们将page table指针准备好，并将这个指针作为第二个参数传递给汇编代码，这个参数会出现在a1寄存器。接下来，我们根据user page table地址生成相应的SATP值，这样我们在返回到用户空间的时候才能完成page table的切换。实际上，我们会在汇编代码trampoline中完成page table的切换，并且也只能在trampoline中完成切换，因为只有trampoline中代码是同时在用户和内核空间中映射。但是我们现在还没有在trampoline代码中，我们现在还在一个普通的C函数中，所以这里我们将page table指针准备好，并将这个指针作为第二个参数传递给汇编代码，这个参数会出现在a1寄存器。
+
+### 6.8 userret函数
+
+1. 第一步是切换page table。在执行*csrw satp, a1*之前，page table应该还是巨大的kernel page table。这条指令会将user page table（在usertrapret中作为第二个参数传递给了这里的userret函数，所以存在a1寄存器中）存储在SATP寄存器中。执行完这条指令之后，page table就变成了小得多的user page table。但是幸运的是，user page table也映射了trampoline page，所以程序还能继续执行而不是崩溃。
+2. sret是我们在kernel中的最后一条指令，当我执行完这条指令：sret是我们在kernel中的最后一条指令，当我执行完这条指令：
+   - 程序会切换会user mode
+   - SEPC寄存器的数值会被拷贝到PC寄存器(程序计数器)
+   - 重新打开中断
+3. 系统调用被刻意设计的看起来像是函数调用，但是背后的user/kernel转换比函数调用要复杂的多。之所以这么复杂，很大一部分原因是要保持user/kernel之间的隔离性，内核不能信任来自用户空间的任何内容。系统调用被刻意设计的看起来像是函数调用，但是背后的user/kernel转换比函数调用要复杂的多。之所以这么复杂，很大一部分原因是要保持user/kernel之间的隔离性，内核不能信任来自用户空间的任何内容。
