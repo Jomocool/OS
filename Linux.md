@@ -398,3 +398,44 @@ atrm 1
 
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/97.png)
 
+## Linux_进程管理
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/98.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/99.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/100.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/101.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/102.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/103.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/104.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/105.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/107.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/108.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/109.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/111.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/112.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/113.png)
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/114.png)
+
+终止指定进程输入进程ID后，还需要输入信号量，输入9强制终止
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/115.png)
+
+如果用户退出后，连接不会立马断掉，因为TCP协议下，外部端口可能会认为是网络延迟导致没有信息收发，所以会从ESTABLISHED转成TIME_WAIT，超时了才会断开
+
+![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/116.png)
