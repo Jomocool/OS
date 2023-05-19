@@ -439,3 +439,17 @@ atrm 1
 如果用户退出后，连接不会立马断掉，因为TCP协议下，外部端口可能会认为是网络延迟导致没有信息收发，所以会从ESTABLISHED转成TIME_WAIT，超时了才会断开
 
 ![](https://github.com/Jomocool/Operator-System/blob/main/Linux-img/116.png)
+
+## Linux_RPM与YUM
+
+![image-20230519154918363](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230519154918363.png)
+
+![image-20230519155235133](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230519155235133.png)
+
+![image-20230519155552871](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230519155552871.png)
+
+![image-20230519155835363](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230519155835363.png)
+
+![image-20230519165254693](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230519165254693.png)
+
+![image-20230519165921877](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230519165921877.png)
