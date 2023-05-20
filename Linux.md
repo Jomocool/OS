@@ -453,3 +453,28 @@ atrm 1
 ![image-20230519165254693](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230519165254693.png)
 
 ![image-20230519165921877](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230519165921877.png)
+
+## Linux_搭建环境
+
+**搭建JavaEE环境**
+
+![image-20230520144754048](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230520144754048.png)
+
+9.注意后面还要加上原先的PATH，即￥PATH
+
+10.注意需要让新的环境变量失效
+
+![image-20230520145824270](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230520145824270.png)
+
+![image-20230520172902502](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230520172902502.png)
+
+安装mysql注意事项：
+
+1.解压后，会出现一系列rpm安装包，但是centos有自带的默认数据库mariadb，需要先删掉
+
+2.手动启动mysqld服务
+
+3.root默认密码是随机的，输入grep "password" /var/log/mysqld.log获取默认密码
+
+
+
