@@ -478,3 +478,78 @@ atrm 1
 
 
 
+## Linux_Shell编程
+
+![image-20230523151258042](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230523151258042.png)
+
+![image-20230523151752851](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230523151752851.png)
+
+![image-20230523152518871](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230523152518871.png)
+
+```shell
+#!/bin/bash
+#案例1：定义变量A，等号左右不能有空格
+A=100
+#输出变量需要加上$
+echo A=$A
+echo "A=$A"
+
+#案例2：撤销变量A
+unset A
+echo "A=$A"
+
+#案例3：声明静态的变量B=2，不能unset
+readonly B=2
+echo "B=$B"
+unset B
+
+#./var.sh输出如下：
+[root@Jomo100 shcode]# vim var.sh
+[root@Jomo100 shcode]# ./var.sh 
+A=100
+A=100
+A=
+B=2
+./var.sh: 第 15 行:unset: B: 无法反设定: 只读 variable
+```
+
+![image-20230523152831954](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230523152831954.png)
+
+![image-20230523153911705](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230523153911705.png)
+
+![image-20230523154303083](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230523154303083.png)
+
+```shell
+#~/bin/bash
+echo "0=$0 1=$1 2=$2"
+echo "所有的参数$*"
+echo "$@"
+echo "参数的个数=$#"
+
+[root@Jomo100 shcode]# ./myshell.sh 100 200
+0=./myshell.sh 1=100 2=200
+所有的参数100 200
+100 200
+参数的个数=2
+```
+
+![image-20230523154751946](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230523154751946.png)
+
+```shell
+#!/bin/bash
+echo "当前执行的进程id=$$"
+#以后台的方式运行一个脚本，并获取它的进程号
+/root/shcode/myshell.sh &
+echo "最后一个后台方式运行的进程id=$!"
+echo "执行的结果是=$?"
+
+[root@Jomo100 shcode]# ./preVar.sh 
+当前执行的进程id=9219
+最后一个后台方式运行的进程id=9220
+执行的结果是=0
+0=/root/shcode/myshell.sh 1= 2=
+所有的参数
+
+参数的个数=0
+```
+
