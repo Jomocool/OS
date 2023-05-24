@@ -553,3 +553,174 @@ echo "执行的结果是=$?"
 参数的个数=0
 ```
 
+![image-20230524164933807](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230524164933807.png)
+
+```shell
+#!/bin/bash
+#案例1：计算(2+3)×4的值
+#使用第一种方式
+RES1=$(((2+3)*4))
+echo "RES1=$RES1"
+#使用第二种方式，推荐使用
+RES2=$[(2+3)*4]
+echo "RES2=$RES2"
+#使用第三种方式expr
+TEMP=`expr 2 + 3`
+RES3=`expr $TEMP \* 4`
+echo "RES3=$RES3"
+
+#案例2：请求出命令行的两个参数[整数]的和 20 50
+SUM=$[$1+$2]
+echo "SUM=$SUM"
+
+
+[root@Jomo100 shcode]# ./oper.sh 20 50
+RES1=20
+RES2=20
+RES3=20
+SUM=70
+```
+
+![image-20230524165241380](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230524165241380.png)
+
+![image-20230524170459001](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230524170459001.png)
+
+```shell
+#!/bin/bash
+if [ "ok" = "ok" ]
+then
+        echo "equal"
+fi
+
+if [ 23 -ge 22 ]
+then
+        echo "ge"
+fi
+
+if [ -f /root/shcode/aaa.txt ]
+then
+        echo "exist"
+fi
+
+
+[root@Jomo100 shcode]# ./ifdemo.sh 
+equal
+ge
+[root@Jomo100 shcode]# touch aaa.txt
+[root@Jomo100 shcode]# ./ifdemo.sh 
+equal
+ge
+exist
+```
+
+![image-20230524171237751](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230524171237751.png)
+
+```shell
+#!/bin/bash
+if [ $1 -ge 60 ]
+then
+        echo "及格了"
+elif [ $1 -lt 60 ]
+then
+        echo "不及格"
+fi
+
+[root@Jomo100 shcode]# ./ifCase.sh 70
+及格了
+[root@Jomo100 shcode]# ./ifCase.sh 50
+不及格
+```
+
+![image-20230524171739491](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230524171739491.png)
+
+```shell
+#!/bin/bash
+case $1 in
+"1")
+echo "周一"
+;;
+"2")
+echo "周二"
+;;
+*)
+echo "other"
+;;
+esac
+
+[root@Jomo100 shcode]# ./testCase.sh 1
+周一
+[root@Jomo100 shcode]# ./testCase.sh 2
+周二
+[root@Jomo100 shcode]# ./testCase.sh 3
+other
+[root@Jomo100 shcode]# ./testCase.sh 4
+other
+```
+
+![image-20230524172431360](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230524172431360.png)
+
+```shell
+#!/bin/bash
+#$*是把输入的参数当作一整个，所以只会输出一句话
+for i in "$*"
+do
+        echo "num is $i"
+done
+
+echo "====================================="
+
+#$@是把输入的参数区别对待，有几个参数就输出几句
+for i in "$@"
+do
+        echo "num is $i"
+done
+
+[root@Jomo100 shcode]# ./testFor1.sh 100 200 300
+num is 100 200 300
+=====================================
+num is 100
+num is 200
+num is 300
+
+
+#!/bin/bash
+SUM=0;
+for((i=1;i<=100;i++))
+do
+        SUM=$[$SUM+$i]
+done
+echo "SUM=$SUM"
+
+[root@Jomo100 shcode]# ./testFor2.sh
+SUM=5050
+
+
+#!/bin/bash
+SUM=0;
+for((i=1;i<=$1;i++))
+do
+	SUM=$[$SUM+$i]
+done
+echo "SUM=$SUM"
+
+./testFor2.sh 100
+SUM=5050
+```
+
+![image-20230524173758817](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230524173758817.png)
+
+```shell
+#!/bin/bash
+i=1;
+SUM=0;
+while [ $i -le $1 ]
+do
+	SUM=$[$SUM+$i]
+	i=$[$i+1]
+done
+echo "SUM=$SUM"
+
+[root@Jomo100 shcode]# ./testWhile.sh 100
+SUM=5050
+```
+
