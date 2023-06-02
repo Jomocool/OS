@@ -724,3 +724,91 @@ echo "SUM=$SUM"
 SUM=5050
 ```
 
+
+
+**Linux_read获取输入**
+
+![image-20230602215407398](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230602215407398.png)
+
+```shell
+#!/bin/bash
+#案例1：读取控制台输入一个NUM1值
+read -p "请输入一个数NUM1=" NUM1
+echo "你输入的NUM1=$NUM1"
+#案例2：读取控制台输入一个NUM2值，在10秒内输入
+read -t 10 -p "请输入一个数NUM2=" NUM2
+echo "你输入的NUM2=$NUM2"
+```
+
+
+
+**Linux_系统函数**
+
+![image-20230602215811180](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230602215811180.png)
+
+![image-20230602215905734](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230602215905734.png)
+
+![image-20230602220316955](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230602220316955.png)
+
+```shell
+#!/bin/bash
+function getSum(){
+        SUM=$[$n1+$n2]
+        echo "SUM=$SUM"
+}
+
+#输入两个值
+read -p "请输入一个数n1=" n1
+read -p "请输入一个数n2=" n2
+
+#调用自定义函数
+getSum $n1 $n2
+```
+
+
+
+**Linux_定时备份数据库**
+
+![image-20230602221123252](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230602221123252.png)
+
+mysql_back_db.sh
+
+```shell
+#!/bin/bash
+#备份目录
+BACKUP=/data/backup/db
+#当前时间
+DATETIME=$(date +%Y-%m-%d_%H%M%S)
+echo $DATETIME
+#数据库的地址
+HOST=localhost
+#数据库用户名
+DB_USER=root
+#数据库密码
+DB_PW=12onetwo
+#备份的数据库名
+DATABASE=jomoedu
+
+#创建备份目录，如果不存在就创建
+[ ! -d "${BACKUP}/${DATETIME}" ] && mkdir -p "${BACKUP}/${DATETIME}"
+
+#备份数据库
+mysqldump  -u${DB_USER} -p${DB_PW} --host=${HOST} -q -R --databases ${DATABASE} | gzip > ${BACKUP}/${DATETIME}/$DATETIME.sql.gz
+
+#将文件处理成tar.gz
+cd ${BACKUP}
+tar -zcvf $DATETIME.tar.gz ${DATETIME}
+#删除对应的备份目录
+rm -rf ${BACKUP}/${DATETIME}
+
+#删除10天欠的备份文件
+find ${BACKUP} -atime +10 -name "*.tar.gz" -exec rm -rf {} \;
+echo "备份数据库${DATABASE}成功~"
+```
+
+crontab -e
+
+```shell
+30 2 * * * /usr/sbin/mysql_db_backup.sh
+```
+
