@@ -812,3 +812,18 @@ crontab -e
 30 2 * * * /usr/sbin/mysql_db_backup.sh
 ```
 
+
+
+## Linux_Python定制篇
+
+![image-20230605171016051](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230605171016051.png)
+
+![image-20230605171708356](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230605171708356.png)
+
+![image-20230605174043080](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230605174043080.png)
+
+![image-20230605175144762](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230605175144762.png)
+
+![image-20230605175154870](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230605175154870.png)
+
+![image-20230605175746529](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230605175746529.png)
