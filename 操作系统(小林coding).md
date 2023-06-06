@@ -469,3 +469,305 @@ if(likely(a==1)){
 
 当有多个同时执行 计算密集型 的线程，为了防止因切换到不同的核心，而导致缓存命中率下降的问题，可以把线程绑定在某一个CPU核心上，性能得到非常可观的提升。
 
+
+
+### 1.4 CPU缓存一致性
+
+**CPU Cache的数据写入**
+
+CPU Cache的结构：CPU Cache是由很多个Cache Line组成的，CPU Line是CPU从内存读取数据的基本单位，而CPU Line是由各种标志（Tag）+数据块（Data Block）组成
+
+数据不光只有读操作，还有写操作，如果数据写入Cache之后，内存与Cache相对应的数据将会不同，这种情况下Cache和内存数据都不一致了，于是我们肯定需要把Cache中的数据同步到内存中。
+
+两种写入数据的方法：
+
+- 写直达（Write Through）
+- 写回（Write Back）
+
+
+
+**写直达**
+
+保存内存与Cache一致性最简单的方式是，把数据同时写入内存和Cache中，这种方法成为写直达（Write Through）
+
+写入钱会先判断数据是否已经在CPU Cache里面：
+
+- 如果数据已经在Cache里面，先将数据更新到Cache里面，再写入到内存里面
+- 如果数据没有在Cache里面，就直接把数据更新到内存里面
+
+缺点：无论数据在不在Cache里面，每次写操作都会写回到内存，这样写操作将会花费大量的时间，性能会受到很大影响
+
+
+
+**写回**
+
+在写回机制中，当发生写操作时，新的数据仅仅被写入Cache Block，只有当修改过的Cache Block被替换时才需要写到内存中，减少了数据写回内存的频率，提高系统的性能
+
+具体步骤：
+
+- 如果当发生写操作时，数据已经在CPU Cache里的话，则把数据更新到CPU Cache里，同时标记CPU Cache里的这个Cache Block为脏（Dirty）的，表示CPU Cache里面的这个Cache Block的数据和内存不一致，这种情况还不需要把数据写回到内存中
+- 如果当发生写操作时，数据所对应的Cache Block存放的是 别的内存地址的数据 的话，就要检查这个Cache Block里的数据是否标记为Dirty，如果已被标记，需要先把这个Cache Block里的数据写回到内存，然后再把当前要写入的数据写入到这个Cache Block，同时标记为Dirty；如果Cache Block没有被标记为Dirty，直接将数据写入到Cache Block就行，再把这个Cache Block标记为Dirty即可，原Cache Block无需写回到内存中
+
+
+
+**缓存一致性问题**
+
+现在CPU都是多核的，由于L1/L2 Cache是多个核心各自独有的，那么会带来多核心的缓存一致性问题。
+
+假设A号核心和B号核心同时运行两个线程，都操作共同变量i（初始值为0）
+
+![image-20230603002933850](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230603002933850.png)
+
+A核心执行i++语句，出于性能的考虑，使用写回策略，先把值为1的执行结果写入到L1/L2 Cache中，然后把L1/L2 Cache中对应的Block标记为脏的，但这个时候数据还没有同步到内存中。这时如果B核心尝试从内存中读取变量i的值，将会得到错误的值，因为正确的i值还未被写回到内存中。所谓缓存一致性问题就是A号核心和B号核心的缓存在这个时候是不一致的。
+
+![image-20230603004340070](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230603004340070.png)
+
+解决这一问题需要一种机制，来同步两个不同核心里面的缓存数据，要做到以下2点：
+
+- 第一点，某个CPU核心里的Cache数据更新时，必须要传播到其他核心的Cache，这称为写传播(Write Propagation)
+
+- 第二点，某个CPU核心里对数据的操作顺序，必须在其他核心看起来顺序是一样的，这称为事物的串行化(Transaction Serialization)
+
+  举例：
+
+  假设有一个含有4个核心的CPU，这4个核心都操作共同变量i（初始值为0）。A号核心先把i值变为100，而此时同一时间B号核心先把i值变为200，这里两个修改都会传播到C和D号核心。
+
+  ![image-20230603005034489](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230603005034489.png)
+
+  问题来了，C号核心先收到了A号核心更新数据的事件，再收到B号核心更新数据的事件，因此C号核心看到的变量i是先变成100，后变成200。而如果D号核心接受到的事件是反过来的，则D号核心看到的是变量i先变成200，再变成100，虽然做到了写传播，但是各个Cache里面的数据仍然不一致。
+
+  所以，我们需要保证C号核心和D号核心都能看到相同顺序的数据变化，比如i变量都是先变成100，再变成200
+
+  要实现事物串形化需要做到以下2点：
+
+  - CPU核心对于Cache中数据的操作，需要同步给其他CPU核心
+  - 引入 锁 的概念，如果两个CPU核心里有相同数据的Cache，对于这个Cache数据的更新，只有拿到了 锁 ，才能进行对应的数据更新
+
+
+
+**总线嗅探**
+
+写传播的原则就是当某个CPU核心更新了Cache中的数据，要把该事件广播通知到其他核心。最常见的实现方式是总线嗅探（Bus Snooping）
+
+当A号CPU核心修改了L1 Cache中变量i的值，通过总线把这个事件广播通知给其他所有核心，然后每个CPU核心都会监听总线上的广播事件，并检查是否有相同的数据在自己的L1 Cache里面，如果B号CPU核心的L1 Cache中有该数据，那么也需要把该数据更新到自己的L1 Cache。
+
+总线嗅探的方式很简单，CPU需要每时每刻监听总线上的⼀切活动，但是不管别的核心的 Cache 是否缓存相同的数据，都需要发出⼀个⼴播事件，这⽆疑会加重总线的负载。另外，总线嗅探只是保证了某个 CPU 核心的 Cache 更新数据这个事件能被其他 CPU 核心知道，但是并不能保证事务串形化。
+
+
+
+**MESI协议**
+
+- Modified：已修改
+- Exclusive：独占
+- Shared：共享
+- Invalidated：已失效
+
+这四个状态来标记Cache Line四个不同的状态
+
+已修改对应着脏标记，代表该Cache Block上的数据已经被更新过，但是还没有写到内存里
+
+已失效表示这个Cache Block里的数据已经失效了，不可以读取该状态的数据
+
+独占和共享状态都代表Cache Block里的数据是干净的，即这个时候Cache Block里的数据和内存里面的数据是一致性的
+
+独占和共享的差别在于，独占状态是，数据只存储在一个CPU核心的Cache里，而其他CPU核心的Cache没有该数据。这个时候如果要向独占Cache写数据，就可以直接自由地写入，而不需要通知其他CPU核心，因为只有这个Cache有这个数据，就不存在缓存一致性问题，于是就可以随便操作该数据。
+
+另外，在独占状态下的数据，如果有其他核心从内存也读取了相同的数据到各自的Cache，那么这个时候，独占状态下的数据就会变成共享状态
+
+共享状态代表着相同的数据在多个CPU核心里的Cache里都有，所以当我们要更新Cache里面的数据的时候，不能直接修改，而是要先向所有的其他CPU核心广播一个请求，要求先把其他核心的Cache中对应的Cache Line标记为无效状态，然后再更新当前Cache里面的数据
+
+eg：
+
+1. 当A号核CPU核心从内存中读取变量i的值，数据被缓存在A号CPU核心自己的Cache里面，此时其他CPU核心的Cache没有缓存该数据，于是标记Cache Line状态为独占，此时其Cache中的数据与内存是一致的
+2. 然后B号CPU核心也从内存中读取了变量i的值，此时会发送消息给其他CPU核心，由于A号CPU核心已经缓存了该数据，所以会把数据返回给B号CPU核心，在这个时候，A和B核心缓存了相同的数据，Cache Line的状态就会变成共享，并且其Cache中的数据与内存也是一致的
+3. 当A号CPU核心要修改Cache中i变量的值，发现数据对应的Cache Line的状态是共享状态，则要向所有其他CPU核心广播一个请求，要求先把其他核心的Cache中对应的Cache Line标记为无效状态，然后A号CPU核心才更新里面的数据，同时标记Cache Line为已修改状态，此时Cache中的数据就与内存不一致了
+4. 如果A号CPU核心继续修改Cache中i变量的值，由于此时的Cache LIne是已修改状态，因此不需要给其他CPU核心发送消息，直接更新数据即可
+5. 如果A号CPU核心的Cache对应的i变量对应的Cache要被替换，发送Cache Line状态是已修改状态，就会在替换前先把数据同步到内存中
+
+所以，发现当Cache Line状态是已修改或者独占状态时，修改更新其数据不需要广播给其他CPU核心
+
+![image-20230606170143573](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606170143573.png)
+
+
+
+**总结**
+
+CPU在读写数据：
+
+- CPU读数据：都是在CPU Cache读写数据的，原因是Cache里CPU很近，读写性能相比内存高出很多。对于Cache里没有缓存CPU所需要的数据的情况，CPU则会从内存中读取数据，并将数据缓存到Cache里面，最后CPU再从Cache读取数据
+- CPU写数据：写直达 或 写回 两种策略
+
+缓存一致性：
+
+1. 写传播
+2. 事物的串行化
+
+基于总线嗅探的MESI协议满足以上两点，保障了缓存一致性
+
+
+
+### 1.5 CPU是如何执行任务的
+
+**问题引入**
+
+![image-20230606171032749](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606171032749.png)
+
+
+
+**CPU如何读写数据的？**
+
+> Cache伪共享是什么？
+
+现在假设有一个双核心的CPU，这两个CPU核心并行运行着两个不同的线程，它们同时从内存中读取两个不同的数据，分类是类型为long的变量A和B，这两个数据的地址在物理内存上是连续的，如果Cache LIne的大小是64字节，并且变量A在Cache Line的开头位置，那么这两个数据是位于同一个Cache Line中，又因为CPU Line是CPU从内存读取数据到Cache的单位，所以这两个数据会被同时读入到了两个CPU核心中各自的Cache中。
+
+![image-20230606172039837](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606172039837.png)
+
+如果两个不同核心的线程分别修改不同的数据，比如1号核心的线程只修改了变量A，或2号CPU核心的线程只修改了变量B，会发生什么？
+
+**分析伪共享问题**
+
+结合保证多核缓存一致的MESI协议，来说明整个过程。
+
+1. 最开始变量A和B都还不在Cache里面，假设1号核心绑定了线程A，2号核心绑定了线程B，线程A只会读写变量A，线程B只会读写变量B
+
+   ![image-20230606172338067](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606172338067.png)
+
+2. 1号核心读取变量A，由于CPU从内存读取数据到Cache的单位是Cache Line，也正好是变了A和B的数据归属于同一个Cache Line，所以A和B的数据都会被加载到Cache，并将此Cache Line标记为独占状态
+
+   ![image-20230606172618661](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606172618661.png)
+
+3. 接着，2号核心开始从内存里读取变量B，同样也是读取Cache Line大小的数据到Cache中，此Cache Line中的数据也包含了变量A和B，此时1号和2号核心的Cache Line状态变为共享状态
+
+   ![image-20230606173143393](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606173143393.png)
+
+4. 1号核心需要修改变量A，发现此Cache Line的状态是共享状态，所以先需要通过总线发送消息给2号核心，通知2号核心把Cache中对应的Cache Line标记为已失效状态，然后1号核心对应的Cache Line状态变成已修改状态，并且修改变量A
+
+   ![](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606173401364.png)
+
+5. 之后，2号核心需要修改变量B，此时2号核心的Cache中对应的Cache Line是已失效状态，另外由于1号核心的Cache也有此相同的数据，且状态为已修改状态，所以要先把1号核心的Cache对应的Cache Line写回内存，然后2号核心再从内存读取Cache Line大小的数据到Cache中，最后把变量B修改到2号核心的Cache中，并将状态标记为已修改状态
+
+   ![image-20230606173650430](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606173650430.png)
+
+Cache并没有起到缓存的效果，虽然变量A和B之间其实没有任何的关系，但是因为同时归属于一个 Cache Line，这个Cache Line中的任意数据被修改后，都会相互影响，从而出现4和5这两个步骤
+
+因此，这种因为多个线程同时读写同一个Cache Line的不同变量时，而导致CPU Cache失效的现象称为伪共享（False Sharing)
+
+
+
+**避免伪共享的方法**
+
+因此，对于多个线程共享的热点数据，即经常会修改的数据，应该避免这些数据刚好在用一个Cache Line中，否则就会出现伪共享问题
+
+![image-20230606175708574](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606175708574.png)
+
+从上面的宏定义可以看到：
+
+- 如果在多核（MP）系统里，该宏定义是__cacheline_aligned，也就是Cache Line的大小
+- 如果在单核系统里，该宏定义是空的
+
+因此针对在同一个Cache Line中的共享的数据，如果在多核之间竞争比较严重，为了防止伪共享现象的发生，可以采用上面的宏定义使得变量在Cache Line里是对齐的
+
+```cpp
+假设有以下结构体
+struct test{
+    int a;
+    int b;
+};
+
+结构体里的两个成员变量a和b在物理内存地址上是连续的，于是它们可能会位于同一个Cache Line中，所以，为了防止前面提到的Cache伪共享问题，我们可以使用上面的宏定义，将b的地址设置为Cache Line对齐地址，如下：
+struct test{
+    int a;
+    int b __cacheline_aligned_in_smp;
+};
+
+这样a和b变量就不会在同一个Cache Line中了
+```
+
+![image-20230606193147880](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606193147880.png)
+
+所以，避免Cache伪共享实际上是用空间换时间的思想
+
+另一个应用层面的规避方案，有一个Java并发框架Discruptor使用 字节填充+继承 的方式，来避免伪共享问题
+
+![image-20230606193314239](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606193314239.png)
+
+RingBufferPad类里7个long类型的名字看起来很奇怪，但事实上，它们虽然看起来毫无作用，但是对性能的提升起到了至关重要的作用
+
+CPU Cache从内存读取数据的单位是CPU Line，一般64位CPU的CPU Line的大小是64字节，一个long类型的数据是8个字节，所以CPU一下会加载8个long类型的数据
+
+根据JVM对象继承关系中父类成员和子类成员，内存地址是连续排列布局的，因此RingBufferPad中的7个long类型数据作为Cache Line前置填充，而RingBuffer中的7个long类型数据则作为Cache Line后置填充，这14个long变量没有任何实际用途，更不会对它们进行读写操作
+
+![image-20230606193705569](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606193705569.png)
+
+另外，RingBufferFelds里面定义的这些变量都是final修饰的，意味着第一次加载之后不会再修改，又由于前后各填充了7个不会被读写的long类型变量，所以无论怎么加载Cache Line，这整个Cache Line里都没有会发生更新操作的数据，于是只要数据被频繁地读取访问，就自然没有数据被换出Cache的可能，也因此不会产生伪共享问题
+
+
+
+**CPU如何选择线程的？**
+
+在Linux内核中，进程和线程都是用tark_struct结构体表示的，区别在于线程的tark_struct结构体里部分资源是共享了进程已创建的资源，比如内存地址空间，代码段、文件描述符等， 所以Linux中的线程也被称为轻量级线程，因为线程的tart_struct相比进程的tatk_struct承载的资源比较少
+
+一般来说，没有创建线程的进程，是只有单个执行流，它被称为是主线程。如果想让进程处理更多事情，可以创建多个线程分别去处理，但不管怎么样，它们对应到内核里都是tark_struct
+
+![image-20230606194224186](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606194224186.png)
+
+所以，Linux内核里的调度器，调度的对象就是tark_struct，接下来就把这个数据结构统称为任务
+
+在Linux系统中，根据任务的优先级以及响应要求，主要分为两种，其中优先级的数值越小，优先级越高：
+
+- 实时任务：对系统的响应时间要求很高，也就是要尽可能快的执行实时任务，优先级在0~99范围内的就算实时任务
+- 普通任务：响应时间没有很高的要求，优先级在100~139范围内的都是普通任务级别
+
+
+
+**调度类**
+
+由于任务有优先级之分，Linux系统为了保障高优先级的任务能够尽可能早的被执行，于是分为了这几种调度类，如下图：
+
+![image-20230606194946921](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606194946921.png)
+
+![image-20230606195037417](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606195037417.png)
+
+
+
+**完全公平调度（Completely Fair Scheduling）**
+
+这个算法的理念是想让分配给每个任务的CPU时间是一样的，于是它为每个任务安排一个虚拟运行时间vruntime，如果一个任务在运行，其运行的越久，该任务的vruntime自然就会越大，而没有被运行的任务，vruntime是不会变化的
+
+在CFS算法调度的时候，会优先选择vruntime少的任务，以保证每个任务的公平性，同时计算vruntime的同时还要考虑普通任务的权重值，并不是优先级的值，内核中会有一个nice级别与权重值的转换表，nice级别越低的权重值就越大
+
+![image-20230606195440064](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606195440064.png)
+
+把NICE_0_LOAD当作一个常量，通过计算，高权重任务的vruntime比低权重的vruntime少，由于是CFS调度，所以会优先选择vruntime少的任务进行调度，所以高权重的任务就会被优先调度了，于是高权重的实际运行时间自然就多了
+
+
+
+**CPU运行队列**
+
+一个系统通常都会运行很多任务，多任务的数量基本都是远超CPU核心数量的，因此这时候就需要排队
+
+事实上，每个CPU都有自己的运行队列，，用于描述在此CPU上所运行的所有进程，其队列包含三个运行队列，Deadline运行队列dl_rq、实时任务运行队列rt_rq和CFS运行队列csf_rq，其中cfs_rq是用红黑树来描述的，按vruntime大小来排序的，最左侧的叶子节点，就是下次会被调度的任务
+
+![image-20230606195926346](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606195926346.png)
+
+这几种调度类是有优先级的，优先级如下：Deadline>Realtime>Fair，这意味着Linux选择下一个任务执行的时候，会按照此优先级顺序进行选择，也就是说先从dl_rq里选择任务，然后从rt_rq里选择任务，最后从csf_里选择任务。因此，实时任务总是会比普通任务优先被执行
+
+
+
+**调整优先级**
+
+如果启动任务时，没有特意指定优先级的话，默认呢情况下都是普通任务，普通任务的调度类是Fair，由CFS调度器来进行管理。CFS调度器的目的是实现任务运行的公平性，也就是保障每个人物的运行时间是差不多的
+
+如果你想让某个普通任务有更多的执行时间，可以调整任务的nice值，从而让优先级高一些的任务执行更多时间。nice值能设置的范围是-20~19，值越低，表明优先级越高，因此，-20是最高优先级，19则是最低优先级，默认优先级是0
+
+事实上，nice值并不是优先级，而是表示优先级的修正数据，它与优先级（priority）的关系是这样的：priority(new)=priority(old)+nice。内核中，priority的范围是0~139，值越低，优先级越高，其中前面的0~99范围是提供给实时任务使用的，而nice值是映射到100~139，这个范围是提供给普通任务用的，因此nice值调整的是普通任务的优先级
+
+![image-20230606200701787](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606200701787.png)
+
+![image-20230606200738769](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606200738769.png)
+
+![image-20230606200749561](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606200749561.png)
+
+nice值调整的是普通任务的优先级，所以不管怎么缩小nice值，任务永远都是普通任务，如果某些任务要求实时性比较高，那么可以考虑改变任务的优先级以及调度策略，使得它变成实时任务
+
+![image-20230606200910961](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230606200910961.png)
