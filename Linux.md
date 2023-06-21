@@ -827,3 +827,59 @@ crontab -e
 ![image-20230605175154870](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230605175154870.png)
 
 ![image-20230605175746529](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230605175746529.png)
+
+
+
+## Linux_centos8
+
+![image-20230613235839036](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230613235839036.png)
+
+
+
+## Linux_日志
+
+![image-20230614222114624](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230614222114624.png)
+
+![image-20230614234030785](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230614234030785.png)
+
+![image-20230614234852286](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230614234852286.png)
+
+![image-20230614234551840](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230614234551840.png)
+
+通过提取日志信息的关键字来分类不同日志的记录文件
+
+
+
+![image-20230614235057158](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230614235057158.png)
+
+![image-20230614235108492](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230614235108492.png)
+
+![image-20230615000642033](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230615000642033.png)
+
+![image-20230621170953200](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621170953200.png)
+
+![image-20230621171055350](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621171055350.png)
+
+![image-20230621171234269](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621171234269.png)
+
+![image-20230621171309528](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621171309528.png)
+
+![image-20230621171624501](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621171624501.png)
+
+![image-20230621172117095](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621172117095.png)
+
+
+
+## Linux_定制自己的Linux系统
+
+![image-20230621172422271](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621172422271.png)
+
+![image-20230621172654123](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621172654123.png)
+
+
+
+## Linux_内核源码
+
+![image-20230621225114445](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621225114445.png)
+
+![image-20230621225349164](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230621225349164.png)
