@@ -1972,3 +1972,342 @@ UDP是没有连接的，所以不需要三次握手，也就不需要像TCP调�
 - 互斥：保证任意时刻只有一个线程访问共享资源
 - 同步：保证线程A应在线程B之前执行（A先写，B后读）
 
+
+
+### 4.3 多线程同步
+
+**竞争与协作**
+
+线程是调度的基本单位，进程是资源分配的基本单位
+
+线程之间是可以共享进程的资源，比如代码段、堆空间、数据段、打开的文件等资源，但每个线程都有自己独立的栈空间
+
+
+
+多个线程共享资源，如果不采取有效措施，就会造成共享数据的混乱
+
+
+
+eg.创建两个线程，分别对共享变量 i 自增 1 执行 10000 次
+
+```cpp
+#include<iostream>//std::cout
+#include<thread>  //std::thread
+
+int i = 0;		  //共享数据
+
+//线程函数：对共享变量 i 自增 1 执行 10000 次
+void test() {
+	for (int n = 0; n < 10000; n++) {
+		i++;
+	}
+}
+
+int main(void) {
+	std::cout << "Start all threads." << std::endl;
+
+	//创建线程
+	std::thread thread_test1(test);
+	std::thread thread_test2(test);
+
+	//等待线程执行完成
+	thread_test1.join();
+	thread_test2.join();
+
+	std::cout << "All threads joined." << std::endl;
+	std::cout << "now i is" << i << std::endl;
+
+	return 0;
+}
+```
+
+按理来说，i变量最后的值应该是20000，但实际情况是可能会出现20000，也可能会出现其他值的情况
+
+
+
+每次运行不但会产生错误，而且得到不同的结果，在计算机里是不能容忍的
+
+
+
+> 为什么会发生这种情况？
+
+![image-20230725014545570](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230725014545570.png)
+
+![image-20230725014624139](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230725014624139.png)
+
+![image-20230725014654304](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230725014654304.png)
+
+
+
+**互斥的概念**
+
+上面的情况称为竞争条件，当多线程相互竞争操作共享变量时，由于运气不好，在执行过程中发生了上下文切换，得到了错误的结果，事实上，每次运行都可能得到不同的结果，因此输出的结果存在不确定性
+
+
+
+由于多线程执行操作共享变量的这段代码可能会导致竞争状态，因此将此段代码称为临界区，它是访问共享资源的代码片段，一定不能给多线程同时执行
+
+
+
+我们希望这段代码是互斥的，也就是保证一个线程在临界区执行时，其他线程应该被阻止进入临界区，换句话说，这段代码执行过程中，最多只能出现一个线程
+
+![image-20230726171544780](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726171544780.png)
+
+互斥并不是只针对多线程。在多进程竞争共享资源时，也同样是可以使用互斥的方式来避免资源竞争造成的资源混乱
+
+
+
+**同步的概念**
+
+互斥解决了并发进程/线程对临界区的使用问题。这种基于临界区控制的交互作用是比较简单的，只要一个进程/线程进入了临界区，其他试图进入临界区的进程/线程都会被阻塞，直到第一个进程/线程离开了临界区
+
+
+
+在多线程里，每个线程并不一定是顺序执行的，它们基本是以各自独立的、不可预知的速度向前推进，但有时候我们又希望多个线程能够密切合作，以实现一个共同的任务
+
+
+
+![image-20230726171912220](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726171912220.png)
+
+
+
+所谓同步，就是并发进程/线程在一些关键点上可能需要互相等待与互通消息，这种相互制约的等待与互通信息称为进程/线程同步
+
+
+
+![image-20230726172009989](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726172009989.png)
+
+注意，同步与互斥是两张不同的概念：
+
+- 同步：操作A应在操作B之前执行，操作C必须在操作A和操作B都完成之后才能执行
+- 互斥：操作A和操作B不能在同一时刻执行
+
+
+
+**互斥与同步的实现和使用**
+
+在进程/线程并发执行的过程中，进程/线程之间存在协作的关系，例如有互斥、同步的关系
+
+为了实现进程/线程间正确的协作，操作系统必须提供实现进程协作的措施和方法，主要的方法有两种：
+
+- 锁：加锁、解锁操作
+- 信号量：P、V操作
+
+这两个都可以方便地实现进程/线程互斥，而信号量比锁的功能更强一些，它还可以方便地实现进程/线程同步
+
+
+
+**锁**
+
+使用加锁和解锁操作可以解决并发线程/进程的互斥问题
+
+
+
+任何想进入临界区的线程，必须先执行加锁操作。若加锁操作顺利通过，则线程可以进入临界区；在完成对临界资源的访问后再执行解锁操作，以释放该临界资源
+
+![image-20230726172708293](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726172708293.png)
+
+根据锁的实现不同，可以分为 忙等待锁 和 无等待锁
+
+
+
+> 忙等待锁的实现
+
+现代CPU体系结构提供的特殊原子操作指令——测试和置位（Test-and-Set）指令
+
+如果用C代码表示Test-and-Set指令，形式如下：
+
+![image-20230726172919829](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726172919829.png)
+
+关键是这些代码是原子执行。因为既可以测试旧值，又可以设置新值，所以把这条指令叫作 测试并设置
+
+
+
+原子操作：原子操作就是要么全部执行，要么都不执行，不能出现执行到一半的中间状态
+
+
+
+可以运用Test-and-Set指令来实现 忙等待锁，代码如下：
+
+![image-20230726173118375](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726173118375.png)
+
+![image-20230726173149288](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726173149288.png)
+
+
+
+> 无等待锁的实现
+
+无等待锁获取不到锁时，不用自旋
+
+
+
+当没获取到锁的时候，就把当前线程放入到锁的等待队列，然后执行调度程序，把CPU让给其他线程执行
+
+![image-20230726173523238](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726173523238.png)
+
+
+
+**信号量**
+
+信号量是操作系统提供的一种协调共享资源访问的方法
+
+
+
+通常信号量表示资源的数量，对应的变量是一个整型(sem)变量
+
+![image-20230726215339898](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726215339898.png)
+
+![image-20230726215416240](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726215416240.png)
+
+![image-20230726215442197](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726215442197.png)
+
+
+
+> 操作系统是如何实现PV操作的？
+
+![image-20230726215537585](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726215537585.png)
+
+
+
+PV操作的函数是由操作系统管理和实现的，所以操作系统已经使得执行PV函数时是具有原子性的
+
+
+
+> PV操作如何使用的呢？
+
+使用信号量实现临界区的互斥访问：
+
+为每类共享资源设置一个信号量s，初始值为1，表示该资源未被占用
+
+只要把进入临界区的操作置于P(s)和V(s)之间，即可实现进程/线程互斥
+
+![image-20230726215810760](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726215810760.png)
+
+![image-20230726215911140](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726215911140.png)
+
+
+
+使用信号量实现事件同步：
+
+同步的方式是设置一个信号量，其初值为0
+
+![image-20230726220341180](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726220341180.png)
+
+![image-20230726220708210](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726220708210.png)
+
+
+
+**生产者—消费者问题**
+
+![image-20230726220802670](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726220802670.png)
+
+![image-20230726220859165](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726220859165.png)
+
+![image-20230726221010867](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221010867.png)
+
+
+
+**经典同步问题**
+
+**哲学家就餐问题**
+
+![image-20230726221135055](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221135055.png)
+
+如何保证哲学家们的动作有序进行，而不会出现有人永远拿不到叉子呢？
+
+
+
+> 方案一
+
+![image-20230726221436892](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221436892.png)
+
+![image-20230726221501789](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221501789.png)
+
+
+
+> 方案二
+
+![image-20230726221536380](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221536380.png)
+
+![image-20230726221602207](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221602207.png)
+
+
+
+> 方案三
+
+![image-20230726221706019](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221706019.png)
+
+![image-20230726221728326](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221728326.png)
+
+
+
+> 方案四
+
+![image-20230726221810825](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221810825.png)
+
+![image-20230726221908750](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221908750.png)
+
+![image-20230726221916562](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221916562.png)
+
+![image-20230726221954498](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726221954498.png)
+
+![image-20230726222137711](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726222137711.png)
+
+
+
+**读者—写者问题**
+
+哲学家进餐问题 对于互斥访问有限的竞争问题（如I/O设备）类的建模过程十分有用
+
+
+
+读者—写者问题为数据库访问建立了一个模型
+
+
+
+![image-20230726222717339](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726222717339.png)
+
+
+
+> 方案一
+
+![image-20230726222735364](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726222735364.png)
+
+![image-20230726222757935](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726222757935.png)
+
+![image-20230726222900544](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726222900544.png)
+
+rCount也是共享变量，所以需要一个锁rCountMutex去互斥rCount的修改
+
+
+
+> 方案二
+
+![image-20230726223200664](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726223200664.png)
+
+![image-20230726223239673](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726223239673.png)
+
+![image-20230726223249518](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726223249518.png)
+
+因为写者之间的写操作需要互斥，所以相比于读者优先策略，写者在write前需要先申请锁，然后write后释放锁，这样做还有一个原因是需要等所有读者读完之后，rCount==0时，V(wDataMutes)唤醒写者的写操作
+
+![image-20230726223540400](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726223540400.png)
+
+
+
+> 方案三
+
+![image-20230726223907694](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726223907694.png)
+
+![image-20230726223939247](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230726223939247.png)
+
+> 为什么加了一个信号量flag，就实现了公平竞争？
+
+在方案一读者优先策略中，只要有读者来了就进入读者队列，直到读者队列为空时，写者才可以进入临界区执行写操作
+
+
+
+而这里的flag就是阻止读者的这种特殊权限（只要读者到达，就可以进入读者队列）
+
+阻止的方式：
+读者队列还没空时，此时来了一个写者，执行了P(flag)操作，后续如果又来了一些读者，它们会阻塞在P(flag)这步上，因此不会进入读者队列。而写者也不能立马写（阻塞在P(wDataMutex)），因为读者队列还没有空，等到读者队列为空时，读者执行V(wDataMutex)唤醒写者写操作
