@@ -1317,6 +1317,94 @@ brk()和mmap()必须一起使用：
 
 
 
+### 3.3 内存满了，会发生什么？
+
+虚拟内存有什么用？
+
+1. 虚拟内存可以使得进程对运行内存超过物理内存大小，因为程序运行符合局部性原理，CPU 访问内存会有很明显的重复访问的倾向性，对于那些没有被经常使用到的内存，我们可以把它换出到物理内存之外，比如硬盘上的 swap 区域
+2. 由于每个进程都有自己的页表，所以每个进程的虚拟内存空间就是相互独立的。进程也没有办法访问其他进程的页表，所以这些页表是私有的，这就解决了多进程之间地址冲突的问题。
+3. 页表里的页表项中除了物理地址之外，还有一些标记属性的比特，比如控制一个页的读写权限，标记该页是否存在等。在内存访问方面，操作系统提供了更好的安全性
+
+
+
+**内存分配的过程是怎样的？**
+
+![image-20230801232648362](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801232648362.png)
+
+申请物理内存的过程如下：
+
+![img](https://cdn.xiaolincoding.com//mysql/other/2f61b0822b3c4a359f99770231981b07.png)
+
+
+
+**哪些内存可以被回收？**
+
+主要有两类内存可以被回收，而且它们的回收方式也不同
+
+![image-20230801233012308](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801233012308.png)
+
+![image-20230801233116575](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801233116575.png)
+
+
+
+**回收内存带来的性能影响**
+
+![image-20230801233307691](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801233307691.png)
+
+- 调整文件页和匿名页的回收倾向
+
+  ![image-20230801233444230](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801233444230.png)
+
+- 尽早触发kswapd内核线程异步回收内存
+
+  ![image-20230801233603334](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801233603334.png)
+
+  ![image-20230801234752596](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801234752596.png)
+
+  ![image-20230801234839635](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801234839635.png)
+
+  ![image-20230801235018725](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801235018725.png)
+
+- NUMA架构下的内存回收策略
+
+  ![image-20230801235115018](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801235115018.png)
+
+  ![image-20230801235144877](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801235144877.png)
+
+  ![image-20230801235245250](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801235245250.png)
+
+
+
+**如何保护一个进程不被OOM杀掉呢？**
+
+![image-20230801235506550](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801235506550.png)
+
+![image-20230801235621337](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230801235621337.png)
+
+
+
+**总结**
+
+内存回收主要有两种方式：
+
+- 后台回收内存：kswapd内核线程回收内存，该方式是异步的，不会阻塞进程的执行
+- 直接回收内存：如果后台异步回收跟不上进程内存申请的速度，就会开始直接回收，该方式是同步的，会阻塞进程的执行
+
+
+
+可被回收的内存类型有两种：
+
+- 文件页的回收：对于干净页是直接释放内存，这个操作不会影响性能，而对于脏页会先写回到磁盘再释放内存，这个操作会发生磁盘I/O，因而影响系统性能
+- 匿名页的回收：如果开启了Swap机制，那么Swap机制会将不常访问的匿名页换出到磁盘中，下次访问时再从磁盘换入到内存中，这个操作是会影响系统性能的
+
+文件页和匿名页的回收都是基于LRU算法的，也就是优先回收不常访问的内存，回收内存的操作基本都会发生磁盘I/O的，如果回收内存的操作很频繁，意味着词频I/O次数会很多，这个过程势必会影响系统的性能
+
+
+
+![image-20230802000441271](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802000441271.png)
+
+
+
 ## 四、进程与线程
 
 ### 4.1 进程、线程基础知识
