@@ -1405,6 +1405,97 @@ brk()和mmap()必须一起使用：
 
 
 
+### 3.4 在4GB物理内存的机器上，申请8G内存会怎么样？
+
+![image-20230802230446619](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802230446619.png)
+
+
+
+**操作系统虚拟内存大小**
+
+![image-20230802230641383](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802230641383.png)
+
+![image-20230802230710974](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802230710974.png)
+
+**32位系统的场景**
+
+![image-20230802230743318](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802230743318.png)
+
+
+
+**64位系统的场景**
+
+![image-20230802230838829](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802230838829.png)
+
+![image-20230802231000358](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802231000358.png)
+
+![image-20230802231041673](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802231041673.png)
+
+![image-20230802231207638](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802231207638.png)
+
+![image-20230802231253545](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802231253545.png)
+
+![image-20230802231403592](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802231403592.png)
+
+![image-20230802231950834](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802231950834.png)
+
+![image-20230802232036298](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232036298.png)
+
+![image-20230802232056560](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232056560.png)
+
+
+
+**Swap机制的作用**
+
+![image-20230802232245089](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232245089.png)
+
+![image-20230802232335943](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232335943.png)
+
+![image-20230802232542745](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232542745.png)
+
+![image-20230802232647409](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232647409.png)
+
+![image-20230802232736238](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232736238.png)
+
+
+
+**实验一：没有开启Swap机制**
+
+![image-20230802232830787](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232830787.png)
+
+![image-20230802232848718](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232848718.png)
+
+![image-20230802232932006](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802232932006.png)
+
+
+
+**实验二：有开启Swap机制**
+
+![image-20230802233012343](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802233012343.png)
+
+![image-20230802233035869](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802233035869.png)
+
+![image-20230802233217326](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802233217326.png)
+
+![image-20230802233305039](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802233305039.png)
+
+![image-20230802233327154](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802233327154.png)
+
+![img](https://cdn.xiaolincoding.com/gh/xiaolincoder/ImageHost/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/%E8%A2%ABkill%E6%8E%89.png)
+
+![image-20230802233352380](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230802233352380.png)
+
+
+
+**总结**
+
+- 在32位操作系统下，进程理论上最大能申请3GB大小的虚拟内存，所以直接申请8GB内存，会申请失败
+- 在64位操作系统下，因为进程理论上最大能申请128TB大小的虚拟内存，即使物理内存只有4GB，申请8GB内存也没问题，因为申请的内存是虚拟内存。如果这块虚拟内存被访问了（要有对应物理内存了），要看系统有没有Swap分区：
+  - 没有Swap分区：物理空间不够，进程会被操作系统杀掉，原因是OOM（Out Of Memory）
+  - 有Swap分区：即使物理内存只有4GB，程序也能正常使用8GB的内存，进程可以正常运行
+
+
+
 ## 四、进程与线程
 
 ### 4.1 进程、线程基础知识
