@@ -1496,6 +1496,127 @@ brk()和mmap()必须一起使用：
 
 
 
+### 3.5 如何避免预读失效和缓存污染的问题？
+
+![img](https://cdn.xiaolincoding.com/gh/xiaolincoder/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/%E7%BC%93%E5%AD%98/%E6%8F%90%E9%97%AE.png)
+
+![image-20230804224921248](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230804224921248.png)
+
+
+
+#### 3.5.1 Linux和MySQL缓存
+
+**Linux操作系统的缓存**
+
+在应用程序读取文件的数据的时候，Linux操作系统是会对读取的文件数据进行缓存的，会缓存在文件系统中的Page Cache（如下图中的页缓存）
+
+![img](https://cdn.xiaolincoding.com/gh/xiaolincoder/ImageHost/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F/%E8%99%9A%E6%8B%9F%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F.png)
+
+Page Cache属于内存空间里的数据，由于内存访问比磁盘访问快很多，在下一次访问相同的数据就不需要通过磁盘I/O了，命中缓存就直接返回数据即可
+
+因此，Page Cache起到了加速访问数据的作用
+
+
+
+**MySQL的缓存**
+
+MySQL的数据是存储在磁盘里的，为了提升数据库的读写性能，InnoDB存储引擎设计了一个`缓存池`(Buffer pool)，Buffer pool属于内存空间里的数据
+
+![img](https://cdn.xiaolincoding.com/gh/xiaolincoder/ImageHost4@main/mysql/innodb/%E7%BC%93%E5%86%B2%E6%B1%A0.drawio.png)
+
+![image-20230805224239265](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805224239265.png)
+
+
+
+#### 3.5.2 传统LRU是如何管理内存数据的？
+
+![image-20230805224626796](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805224626796.png)
+
+![image-20230805224709843](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805224709843.png)
+
+![image-20230805224723660](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805224723660.png)
+
+
+
+#### 3.5.3 预读失效，怎么办？
+
+**什么是预读机制？**
+
+![image-20230805224829968](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805224829968.png)
+
+![image-20230805224858049](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805224858049.png)
+
+
+
+**预读失效会带来什么问题？**
+
+![image-20230805224936224](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805224936224.png)
+
+
+
+**如何避免预读失效造成的影响？**
+
+![image-20230805225241640](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805225241640.png)
+
+> Linux是如何避免预读失效带来的影响？
+
+![image-20230805225650471](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805225650471.png)
+
+![image-20230805225943132](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805225943132.png)
+
+![image-20230805230038548](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230038548.png)
+
+![image-20230805230106113](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230106113.png)
+
+> MySQL是如何避免预读失效带来的影响？
+
+![image-20230805230215194](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230215194.png)
+
+![image-20230805230238033](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230238033.png)
+
+![image-20230805230249224](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230249224.png)
+
+
+
+#### 3.5.4 缓存污染，怎么办？
+
+**什么是缓存污染？**
+
+![image-20230805230433638](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230433638.png)
+
+
+
+**缓存污染会带来什么问题？**
+
+![image-20230805230510521](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230510521.png)
+
+![image-20230805230550384](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230550384.png)
+
+![image-20230805230621920](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230621920.png)
+
+![image-20230805230643017](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230643017.png)
+
+
+
+**怎么避免缓存污染造成的影响？**
+
+![image-20230805230721601](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230721601.png)
+
+![image-20230805230816118](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805230816118.png)
+
+MySQL的方式可以理解为经过那么长的时间，这个页还停留在old区域而没被淘汰，说明是常用页，可以升级到young区域。而如果在1秒内又第二次访问了，说明该页当前是在批量读入，还无法确定是否为常用页。
+
+
+
+#### 3.5.5 总结
+
+传统LRU算法遇到的问题及解决方式：
+
+- 预读失效：改善链表结构
+- 缓存污染：提高进入活跃LRU链表或young区域的门槛
+
+
+
 ## 四、进程与线程
 
 ### 4.1 进程、线程基础知识
