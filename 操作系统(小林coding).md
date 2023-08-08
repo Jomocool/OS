@@ -1504,7 +1504,7 @@ brk()和mmap()必须一起使用：
 
 
 
-#### 3.5.1 Linux和MySQL缓存
+**Linux和MySQL缓存**
 
 **Linux操作系统的缓存**
 
@@ -1528,7 +1528,7 @@ MySQL的数据是存储在磁盘里的，为了提升数据库的读写性能，
 
 
 
-#### 3.5.2 传统LRU是如何管理内存数据的？
+**传统LRU是如何管理内存数据的？**
 
 ![image-20230805224626796](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230805224626796.png)
 
@@ -1538,7 +1538,7 @@ MySQL的数据是存储在磁盘里的，为了提升数据库的读写性能，
 
 
 
-#### 3.5.3 预读失效，怎么办？
+**3.5.3 预读失效，怎么办？**
 
 **什么是预读机制？**
 
@@ -1578,7 +1578,7 @@ MySQL的数据是存储在磁盘里的，为了提升数据库的读写性能，
 
 
 
-#### 3.5.4 缓存污染，怎么办？
+缓存污染，怎么办？
 
 **什么是缓存污染？**
 
@@ -1608,12 +1608,372 @@ MySQL的方式可以理解为经过那么长的时间，这个页还停留在old
 
 
 
-#### 3.5.5 总结
+**总结**
 
 传统LRU算法遇到的问题及解决方式：
 
 - 预读失效：改善链表结构
 - 缓存污染：提高进入活跃LRU链表或young区域的门槛
+
+
+
+### 3.6 深入理解Linux虚拟内存管理
+
+**到底什么是虚拟内存地址**
+
+![image-20230808121236289](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808121236289.png)
+
+![image-20230808121333694](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808121333694.png)
+
+
+
+**为什么要使用虚拟地址访问内存**
+
+> 如果在程序中直接使用物理内存地址会发生什么情况？
+
+![image-20230808121521372](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808121521372.png)
+
+![image-20230808121602874](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808121602874.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/92bcb7acbb591d2db4a364f7330eaccc.png)
+
+![image-20230808121754955](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808121754955.png)
+
+![image-20230808121832772](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808121832772.png)
+
+![image-20230808121853132](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808121853132.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/769ed056eefb1e3d6419472bff87d036.png)
+
+![image-20230808121919935](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808121919935.png)
+
+
+
+**进程虚拟内存空间**
+
+![image-20230808122612997](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808122612997.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/ca8cb1079e4371df468be92096e0c756.png)
+
+![image-20230808122715339](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808122715339.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/44a250314e882d3ff1f750ead0573ec8.png)
+
+![image-20230808122743138](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808122743138.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/f68baab3ae200bbe7496d96e341973ad.png)
+
+![image-20230808122837107](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808122837107.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/807727b1242144d3a883d2436a45025c.png)
+
+![image-20230808122914932](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808122914932.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/b1402bf81de260b86ce0cb4c19cd4330.png)
+
+![image-20230808125812245](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808125812245.png)
+
+
+
+**Linux进程虚拟内存空间**
+
+**32位机器上进程虚拟内存空间分布**
+
+![image-20230808125955626](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808125955626.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/ffb6e1727e2289f142f6a2a6291cd68c.png)
+
+![image-20230808131134328](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808131134328.png)
+
+![image-20230808132103774](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808132103774.png)
+
+![image-20230808132131772](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808132131772.png)
+
+
+
+**64位机器上进程虚拟内存空间分布**
+
+![image-20230808132236371](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808132236371.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/4956918c43e186d49df7b9802f080de8.png)
+
+![image-20230808132401907](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808132401907.png)
+
+![image-20230808132931914](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808132931914.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/532e6cdf4899588f8b873b6435cba2d8.png)
+
+![image-20230808133042689](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808133042689.png)
+
+
+
+**进程虚拟内存空间的管理**
+
+无论是32位还是64位，都有如下几个核心内存区域：
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/b1402bf81de260b86ce0cb4c19cd4330-20230309233758868.png)
+
+![image-20230808133306381](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808133306381.png)
+
+![image-20230808133430942](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808133430942.png)
+
+![image-20230808133443497](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808133443497.png)
+
+![](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808133516932.png)
+
+![image-20230808133638161](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808133638161.png)
+
+![image-20230808133857214](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808133857214.png)
+
+
+
+**内核如何划分用户态和内核态虚拟内存空间**
+
+![image-20230808134048575](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808134048575.png)
+
+![image-20230808134115072](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808134115072.png)
+
+![image-20230808134149188](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808134149188.png)
+
+
+
+**内核如何布局进程虚拟内存空间**
+
+![image-20230808134644084](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808134644084.png)
+
+![image-20230808134801962](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808134801962.png)
+
+![image-20230808135029541](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808135029541.png)![image.png](https://cdn.xiaolincoding.com//mysql/other/2b2dbb2b6ea19871152a3bf6566df205.png)
+
+![image-20230808135203858](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808135203858.png)
+
+
+
+**内核如何管理虚拟内存区域**
+
+![image-20230808135402587](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808135402587.png)
+
+![image-20230808135414137](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808135414137.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/4956390184c51584798be1e5aaabedd1.png)
+
+
+
+**定义虚拟内存区域的访问权限和行为规范**
+
+![image-20230808135616345](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808135616345.png)
+
+![image-20230808135748029](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808135748029.png)
+
+![image-20230808135801520](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808135801520.png)
+
+![image-20230808135843728](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808135843728.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/600ef23c454d9f3653ece44debaaf3a7.png)
+
+![image-20230808140011705](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140011705.png)
+
+![image-20230808140036878](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140036878.png)
+
+
+
+**关联内存映射中的映射关系**
+
+![image-20230808140232972](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140232972.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/020416146a97ca88b40ac9b5c0460375.png)
+
+![image-20230808140319224](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140319224.png)
+
+![image-20230808140336143](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140336143.png)
+
+
+
+**针对虚拟内存区域的相关操作**
+
+![image-20230808140409846](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140409846.png)
+
+![image-20230808140429575](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140429575.png)
+
+![image-20230808140448954](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140448954.png)
+
+![进程中管理文件列表结构.png](https://cdn.xiaolincoding.com//mysql/other/962e5cee8366009b565796896f22ad77.png)
+
+![image-20230808140535348](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140535348.png)
+
+
+
+**虚拟内存区域在内核中是如何被组织的**
+
+![image-20230808140743122](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140743122.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/d1e65b91b67422c2cc08a04549c5f3ba.png)
+
+![image-20230808140844462](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140844462.png)
+
+![image-20230808140850070](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808140850070.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/d945d22667c4ea56dbd2f19677306a91.png)
+
+
+
+**程序编译后的二进制文件如何映射到虚拟内存空间中**
+
+![image-20230808141020343](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808141020343.png)
+
+![image-20230808141050604](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808141050604.png)
+
+```c
+static int load_elf_binary(struct linux_binprm *bprm)
+{
+      ...... 省略 ........
+  // 设置虚拟内存空间中的内存映射区域起始地址 mmap_base
+  setup_new_exec(bprm);
+
+     ...... 省略 ........
+  // 创建并初始化栈对应的 vm_area_struct 结构。
+  // 设置 mm->start_stack 就是栈的起始地址也就是栈底，并将 mm->arg_start 是指向栈底的。
+  retval = setup_arg_pages(bprm, randomize_stack_top(STACK_TOP),
+         executable_stack);
+
+     ...... 省略 ........
+  // 将二进制文件中的代码部分映射到虚拟内存空间中
+  error = elf_map(bprm->file, load_bias + vaddr, elf_ppnt,
+        elf_prot, elf_flags, total_size);
+
+     ...... 省略 ........
+ // 创建并初始化堆对应的的 vm_area_struct 结构
+ // 设置 current->mm->start_brk = current->mm->brk，设置堆的起始地址 start_brk，结束地址 brk。 起初两者相等表示堆是空的
+  retval = set_brk(elf_bss, elf_brk, bss_prot);
+
+     ...... 省略 ........
+  // 将进程依赖的动态链接库 .so 文件映射到虚拟内存空间中的内存映射区域
+  elf_entry = load_elf_interp(&loc->interp_elf_ex,
+              interpreter,
+              &interp_map_addr,
+              load_bias, interp_elf_phdata);
+
+     ...... 省略 ........
+  // 初始化内存描述符 mm_struct
+  current->mm->end_code = end_code;
+  current->mm->start_code = start_code;
+  current->mm->start_data = start_data;
+  current->mm->end_data = end_data;
+  current->mm->start_stack = bprm->p;
+
+     ...... 省略 ........
+}
+```
+
+![image-20230808141209643](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808141209643.png)
+
+
+
+**内核虚拟内存空间**
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/fc1b281658bdf92edf7ef6421c85d2cc.png)
+
+![image-20230808141329366](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808141329366.png)
+
+![image-20230808141357744](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808141357744.png)
+
+
+
+**32位体系内核虚拟内存空间布局**
+
+**直接映射区**
+
+![image-20230808141832793](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808141832793.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/1d91dd17f2390c91f6693b9e686ccc13.png)
+
+![image-20230808141929315](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808141929315.png)
+
+![image-20230808142127162](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808142127162.png)
+
+![image-20230808142246076](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808142246076.png)
+
+![image-20230808142352434](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808142352434.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/1cf5fc48692826d8446638bbc5dd0e0b.png)
+
+
+
+**ZONE_HIGHMEM高端内存**
+
+![image-20230808142619257](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808142619257.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/42ac90617218ba33ce7fdd16bdaa0c5c.png)
+
+
+
+**vmalloc动态映射区**
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/0bd4766b19d043bb4aebdd06bdf8e67c.png)
+
+![image-20230808142856822](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808142856822.png)
+
+
+
+**永久映射区**
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/8638152cae4ee85e8467128cb3ffec76.png)
+
+![image-20230808142942939](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808142942939.png)
+
+
+
+**固定映射区**
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/0ea1b8d1d2e31c36001df7652f418e5e.png)
+
+
+
+**临时映射区**
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/0d19dc439390c46612e31ee973f83145.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/fcb8b59a4b73a823603b6cbd4f720b5d.png)
+
+![image-20230808143141883](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808143141883.png)
+
+
+
+**32位体系结构下Linux虚拟内存空间整体布局**
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/68763fe509b7adf5987a3ce96c9d12ee.png)
+
+
+
+**64位体系内核虚拟内存空间布局**
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/e1f2e689c2754b2af540c6d0b6ab327f.png)
+
+
+
+**64位体系结构下Linux虚拟内存空间整体布局**
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/84eb41fc42b790865eb8bc15d3a2892a.png)
+
+
+
+**到底什么是物理内存地址**
+
+![image-20230808143835093](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808143835093.png)
+
+![CPU缓存结构.png](https://cdn.xiaolincoding.com//mysql/other/560cee15346204f216f8b144a6c2a18c.png)
+
+![image-20230808143905245](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808143905245.png)
+
+![image.png](https://cdn.xiaolincoding.com//mysql/other/647cd97d53cb7d2a67067c90996fa4e8.png)
+
+![image-20230808143938187](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808143938187.png)
+
+![存储器模块.png](https://cdn.xiaolincoding.com//mysql/other/a2112f84eed5dc53dd760cf6a5fdb538.png)
+
+![image-20230808144049766](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808144049766.png)
+
+![image-20230808144107662](https://md-jomo.oss-cn-guangzhou.aliyuncs.com/IMG/image-20230808144107662.png)
 
 
 
